@@ -197,3 +197,16 @@ rf_stream/rf_stream_rx_runs
 rf_stream/rf_stream_rx_runs/
 *.bin
 rf_stream_rx_runs/run_20260427_112119/captures.csv
+
+rf_stream/stage2_out_xgb
+rf_stream/ber_sweep*
+*.pt
+*.onnx
+rf_stream/airlink/*
+*.npz
+rf_stream/bg_noise
+rf_stream_rx_runs
+rf_stream/multitask_model
+rf_stream/multitask_model_v2
+rf_stream/paper
+rf_stream/paper_figures

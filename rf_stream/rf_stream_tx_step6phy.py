@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-rf_stream_tx_step6phy.py  – Step 6 TX
+rf_stream_tx_step6phy.py  – Step 7 TX
 
 Builds on step5 (non-cyclic streaming, ring buffer, Schmidl-Cox STF, multi-LTF,
 TX hardware conjugation) and adds:
@@ -9,9 +9,12 @@ TX hardware conjugation) and adds:
   • BER evaluation mode: transmit known PRNG payload (--ref_seed / --ref_len)
   • Run-metadata JSON saved to --out_root at startup (consumed by analyzer)
   • Sweep mode unchanged from step5
+  • Step7: per-packet ground-truth written to out_dir/tx_truth.jsonl (one JSON
+    line per transmitted packet: seq, payload_crc32, frame_crc32, modulation,
+    tx_gain, scrambler_seed, frame_bits_len, and all PHY config fields).
 
 Hardware note: TX sends  np.conj(buf) * 4096  (IQ-swap compensation for PlutoSDR).
-RX step6 compensates with conj(rxw) in its outer demod loop.
+RX step7 compensates with conj(rxw) in its outer demod loop.
 """
 
 import argparse
@@ -349,22 +352,46 @@ def producer_packets(
     chunks = [data[i: i + chunk_bytes] for i in range(0, len(data), chunk_bytes)] if chunk_bytes > 0 else [data]
     total  = len(chunks)
 
-    while not stop_ev.is_set():
-        for seq, ch in enumerate(chunks):
-            if stop_ev.is_set():
-                break
-            fb  = build_packet_bytes(seq, total, ch)
-            sig = bytes_to_ofdm_samples(
-                fb, cfg.repeat, stf, ltf, const_tbl, bps,
-                cfg.fs, cfg.tone_duration_ms, cfg.tone_freq_hz,
-                cfg.gap_short, cfg.gap_long, cfg.tx_scale,
-            )
-            sig = fit_to_fixed_len(sig, cfg.fixed_len)
-            q.put(sig, block=True)
-            bpos      = N_DATA * bps
-            num_syms  = int(np.ceil((len(fb) * 8 + (cfg.repeat - 1)) / bpos))
-            print(f"[TX] enq seq={seq}/{total-1}  payload={len(ch)}B  "
-                  f"frame={len(fb)}B  ofdm_syms={num_syms}  mod={cfg.modulation}")
+    out_dir    = os.path.join(cfg.out_root, cfg.run_id)
+    truth_path = os.path.join(out_dir, "tx_truth.jsonl")
+    with open(truth_path, "a") as truth_fh:
+        while not stop_ev.is_set():
+            for seq, ch in enumerate(chunks):
+                if stop_ev.is_set():
+                    break
+                fb  = build_packet_bytes(seq, total, ch)
+                sig = bytes_to_ofdm_samples(
+                    fb, cfg.repeat, stf, ltf, const_tbl, bps,
+                    cfg.fs, cfg.tone_duration_ms, cfg.tone_freq_hz,
+                    cfg.gap_short, cfg.gap_long, cfg.tx_scale,
+                )
+                sig = fit_to_fixed_len(sig, cfg.fixed_len)
+                q.put(sig, block=True)
+                bpos      = N_DATA * bps
+                num_syms  = int(np.ceil((len(fb) * 8 + (cfg.repeat - 1)) / bpos))
+                truth_rec = {
+                    "seq":            seq,
+                    "total":          total,
+                    "payload_len":    len(ch),
+                    "payload_crc32":  zlib.crc32(ch) & 0xFFFFFFFF,
+                    "frame_crc32":    int.from_bytes(fb[-4:], "little"),
+                    "modulation":     cfg.modulation,
+                    "bps":            bps,
+                    "repeat":         cfg.repeat,
+                    "stf_repeats":    cfg.stf_repeats,
+                    "ltf_symbols":    cfg.ltf_symbols,
+                    "fixed_len":      cfg.fixed_len,
+                    "gap_short":      cfg.gap_short,
+                    "gap_long":       cfg.gap_long,
+                    "tx_scale":       cfg.tx_scale,
+                    "tx_gain":        cfg.tx_gain,
+                    "scrambler_seed": 127,
+                    "frame_bits_len": len(fb) * 8,
+                }
+                truth_fh.write(json.dumps(truth_rec) + "\n")
+                truth_fh.flush()
+                print(f"[TX] enq seq={seq}/{total-1}  payload={len(ch)}B  "
+                      f"frame={len(fb)}B  ofdm_syms={num_syms}  mod={cfg.modulation}")
 
     print("[TX] producer done – idling.")
     while not stop_ev.is_set():
@@ -398,7 +425,7 @@ def producer_sweep(stop_ev: threading.Event, q: "queue.Queue[np.ndarray]", cfg: 
 # Main
 # =============================================================================
 def main():
-    ap = argparse.ArgumentParser("Step6 PHY TX – multi-modulation streaming (non-cyclic)")
+    ap = argparse.ArgumentParser("Step7 PHY TX – multi-modulation streaming (non-cyclic) + tx_truth.jsonl")
     ap.add_argument("--uri",     required=True)
     ap.add_argument("--fc",      type=float, required=True)
     ap.add_argument("--fs",      type=float, required=True)

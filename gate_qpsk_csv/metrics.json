@@ -1,0 +1,14 @@
+{
+  "run_dir": "rf_stream/ber_sweep/run_20260427_230640",
+  "n_val": 205,
+  "pos_val": 184,
+  "neg_val": 21,
+  "target_recall": 0.98,
+  "recommended_threshold": 0.9488984942436218,
+  "thr_info": {
+    "mode": "target_recall",
+    "prec": 1.0,
+    "rec": 0.9836956521739078
+  },
+  "roc_auc_approx": 0.9999999999999473
+}

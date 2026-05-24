@@ -1,0 +1,13 @@
+{
+  "run_dir": null,
+  "n_val": 5057,
+  "pos_val": 3066,
+  "neg_val": 1991,
+  "target_recall": 0.98,
+  "recommended_threshold": 0.27419835329055786,
+  "thr_info": {
+    "mode": "target_recall",
+    "prec": 0.8084476590156555,
+    "rec": 0.980104386806488
+  }
+}
