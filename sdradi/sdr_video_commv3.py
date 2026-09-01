@@ -944,7 +944,21 @@ class OFDMTransceiver:
         
         self.data_indices = np.array([c for c in used_carriers if c not in self.pilot_indices])
         self.data_indices = self.data_indices[:num_data]
-    
+
+        # Signed-frequency coordinates for the receiver.
+        # The pilot bins are monotonic as raw FFT indices (e.g. [1, 14, 38, 51])
+        # but NOT in true signed frequency ([+1, +14, -26, -13]). A physical
+        # channel (fractional timing residual, multipath) is smooth in signed
+        # frequency, so channel interpolation and the pilot-phase delay fit
+        # must run on this axis, never on the raw-index axis.
+        half = fft_size // 2
+        bins = np.arange(fft_size)
+        self.carrier_freqs = np.where(bins < half, bins, bins - fft_size)
+        pilot_freqs = np.where(self.pilot_indices < half,
+                               self.pilot_indices, self.pilot_indices - fft_size)
+        self.pilot_freq_order = np.argsort(pilot_freqs)
+        self.pilot_freqs = pilot_freqs[self.pilot_freq_order]
+
     def modulate(self, bits: np.ndarray) -> np.ndarray:
         """
         Modulate bits to OFDM time-domain signal.
@@ -1041,50 +1055,51 @@ class OFDMTransceiver:
             # H_pilot = Rx / Tx_Known
             h_pilots = rx_pilots / self.pilot_symbols
             
-            # Enhanced Channel Estimation with Cyclic-Aware Interpolation
-            # The FFT output is cyclic: index 0 is DC, index N-1 is adjacent to index 1
-            # We add virtual pilots at the edges to prevent extrapolation errors
-            
-            pilot_idx = np.array(self.pilot_indices)
+            # Enhanced Channel Estimation with Edge-Aware Interpolation
+            # Interpolation runs over SIGNED frequency (see _setup_carriers):
+            # the raw-index pilot grid is non-monotonic in true frequency, and
+            # interpolating over raw indices blends opposite band edges across
+            # the guard band. The result stays indexed by raw FFT bin.
+            # We add virtual pilots at the band edges to prevent extrapolation errors
+
             h_pilots_arr = np.array(h_pilots)
-            
-            # Sort pilots by index
-            sort_order = np.argsort(pilot_idx)
-            pilot_idx_sorted = pilot_idx[sort_order]
-            h_sorted = h_pilots_arr[sort_order]
-            
-            # Add virtual pilots at DC (index 0) and edge (index N-1) using nearest pilot
+
+            # Sort pilots by signed frequency
+            pilot_f_sorted = self.pilot_freqs
+            h_sorted = h_pilots_arr[self.pilot_freq_order]
+
+            # Add virtual pilots at the band edges using nearest pilot
             # This prevents extrapolation at edges
-            if pilot_idx_sorted[0] > 0:
-                # Extend to index 0 using first pilot value
-                pilot_idx_sorted = np.insert(pilot_idx_sorted, 0, 0)
+            if pilot_f_sorted[0] > -(cfg.fft_size // 2):
+                # Extend to the lowest signed frequency using first pilot value
+                pilot_f_sorted = np.insert(pilot_f_sorted, 0, -(cfg.fft_size // 2))
                 h_sorted = np.insert(h_sorted, 0, h_sorted[0])
-            
-            if pilot_idx_sorted[-1] < cfg.fft_size - 1:
-                # Extend to index N-1 using last pilot value
-                pilot_idx_sorted = np.append(pilot_idx_sorted, cfg.fft_size - 1)
+
+            if pilot_f_sorted[-1] < cfg.fft_size // 2 - 1:
+                # Extend to the highest signed frequency using last pilot value
+                pilot_f_sorted = np.append(pilot_f_sorted, cfg.fft_size // 2 - 1)
                 h_sorted = np.append(h_sorted, h_sorted[-1])
-            
+
             # Separate magnitude and phase for robust interpolation
             h_mag = np.abs(h_sorted)
             h_phase = np.angle(h_sorted)
             h_phase_unwrapped = np.unwrap(h_phase)
-            
-            # Interpolate magnitude and phase separately
-            all_indices = np.arange(cfg.fft_size)
-            h_interp_mag = np.interp(all_indices, pilot_idx_sorted, h_mag)
-            h_interp_phase = np.interp(all_indices, pilot_idx_sorted, h_phase_unwrapped)
-            
+
+            # Interpolate magnitude and phase separately (query axis: signed
+            # frequency of every raw FFT bin, so h_interp stays raw-indexed)
+            h_interp_mag = np.interp(self.carrier_freqs, pilot_f_sorted, h_mag)
+            h_interp_phase = np.interp(self.carrier_freqs, pilot_f_sorted, h_phase_unwrapped)
+
             # Recombine
             h_interp = h_interp_mag * np.exp(1j * h_interp_phase)
-            
+
             # Debug: Estimate Time Delay from Phase Slope using ORIGINAL pilots (not extended)
-            # Slope = d(phi)/dk. Delay (samples) = -Slope * N / (2*pi)
+            # Slope = d(phi)/df over signed frequency. Delay (samples) = -Slope * N / (2*pi)
             if sym_idx == 0:
                 # Simple linear regression on original pilot phases
-                original_phases = np.unwrap(np.angle(h_pilots_arr))
-                if len(pilot_idx) >= 2:
-                    slope, intercept = np.polyfit(pilot_idx, original_phases, 1)
+                original_phases = np.unwrap(np.angle(h_pilots_arr[self.pilot_freq_order]))
+                if len(self.pilot_indices) >= 2:
+                    slope, intercept = np.polyfit(self.pilot_freqs, original_phases, 1)
                     est_delay = -slope * cfg.fft_size / (2 * np.pi)
                     # print(f"[Sync] Est Delay: {est_delay:.2f} samples (Phase Slope: {slope:.3f})")
             
@@ -1151,19 +1166,20 @@ class OFDMTransceiver:
         # Pilot Estimate
         rx_pilots = freq_sym[self.pilot_indices]
         h_pilots = rx_pilots / self.pilot_symbols
-        
-        # Phase Slope
-        h_phase = np.angle(h_pilots)
+
+        # Phase Slope (over signed frequency: the raw-index pilot grid is
+        # non-monotonic in true frequency, see _setup_carriers)
+        h_phase = np.angle(h_pilots[self.pilot_freq_order])
         h_phase_unwrapped = np.unwrap(h_phase)
-        
+
         # Linear Regression
-        # Phase(k) = -2*pi * k * delay / N
+        # Phase(f) = -2*pi * f * delay / N  (f = signed frequency)
         # Slope = -2*pi * delay / N
         # Delay = -Slope * N / (2*pi)
-        
+
         # Use simple polyfit
         if len(h_phase_unwrapped) > 1:
-            slope, intercept = np.polyfit(self.pilot_indices, h_phase_unwrapped, 1)
+            slope, intercept = np.polyfit(self.pilot_freqs, h_phase_unwrapped, 1)
             est_delay = -slope * cfg.fft_size / (2 * np.pi)
             return est_delay
         else:
