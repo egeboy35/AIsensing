@@ -10,7 +10,18 @@ authors = [{ name = "Kaikai Liu", email = "kaikai.liu@sjsu.edu" }]
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "numpy"
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "torch",
+    "einops",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+sionna = [
+    "tensorflow",
+    "sionna",
 ]
 
 [project.urls]
