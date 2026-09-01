@@ -6,6 +6,17 @@ can check by hand.
 """
 
 import math
+import os
+import sys
+
+# Self-contained bootstrap: make the repository root importable and keep
+# matplotlib headless, without relying on a conftest.py. Keeping this here
+# rather than in tests/conftest.py avoids colliding with the shared
+# conftest that the hardware-free pytest suite introduces separately.
+os.environ.setdefault("MPLBACKEND", "Agg")
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import numpy as np
 import pytest
