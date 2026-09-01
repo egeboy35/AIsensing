@@ -806,6 +806,18 @@ Radar config `config_phaser` (Phaser_10GHz_DevKit): baseline RD map 64 x 667 bin
 
 
 **Marginal rows.** `range_zero_padding` = 1 (+0.36 dB [+0.018, +1.73]) clears zero by less than 0.10 dB. The equal-false-alarm audit puts each configuration within about 0.09 dB of the rate it was solved for, so a margin that small sits inside the calibration residual. Treat these as suggestive rather than established; confirming one would need a larger frame budget and more calibration frames.
+
+**Against detection theory.** The integration axes have a closed-form prediction, so they double as a check on everything upstream of them:
+
+| change | prediction | predicted | measured | difference |
+|---|---|---|---|---|
+| 64 -> 32 chirps | 10 log10(N) | -3.01 dB | -2.62 dB | +0.39 dB |
+| 64 -> 128 chirps | 10 log10(N) | +3.01 dB | +2.90 dB | -0.11 dB |
+| 2 non-coherent looks | Albersheim | +2.33 dB | +2.76 dB | +0.43 dB |
+| 4 non-coherent looks | Albersheim | +4.54 dB | +4.67 dB | +0.12 dB |
+| 8 non-coherent looks | Albersheim | +6.61 dB | +6.43 dB | -0.17 dB |
+
+Every row lands within 0.43 dB of its prediction. Albersheim's approximation is for a non-fluctuating target in a linear detector, which is the target model this simulator generates, and is evaluated only inside the range it is stated for. A harness with a systematic error in the simulator, the calibration or the metric would not reproduce these numbers, so this is the strongest external evidence here that the rest of the table means what it says. It is a check on the measurement chain, not a validation of the simulator against hardware -- nothing in this study touches a radio.
 **4 of the 8 axes move the curve** by more than their own 95% interval (`cfar_training_cells`, `range_zero_padding`, `coherent_chirps`, `noncoherent_looks`); the other 4 do not at this budget (`cfar_guard_cells`, `nms_kernel`, `mtd_filter`, `cfar_averaging`).
 
 **Doubling the dwell time, two ways.** Doubling the chirp count -- coherent integration, one detection per frame as before -- buys +2.90 dB [+1.31, +4.25]. Spending the same extra dwell on a second look integrated non-coherently buys +2.76 dB [+1.61, +4.06].

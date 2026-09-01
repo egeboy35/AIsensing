@@ -260,3 +260,46 @@ def bootstrap_pd_difference(
         "pd_difference_hi": float(np.percentile(diff, 100.0 - tail)),
         "pd_difference_se": float(np.std(diff, ddof=1)) if len(diff) > 1 else 0.0,
     }
+
+# Validity range Albersheim states for the approximation, and the range this
+# module will evaluate it over. Outside it the closed form is not claimed to
+# hold and the callers report "outside the approximation's range" instead.
+ALBERSHEIM_PD = (0.1, 0.9)
+ALBERSHEIM_PFA = (1e-7, 1e-3)
+ALBERSHEIM_N = (1, 8096)
+
+
+def albersheim_snr_db(pd: float, pfa: float, n_pulses: int) -> float | None:
+    """Single-pulse SNR needed for detection probability ``pd`` at ``pfa``.
+
+    Albersheim's empirical closed form for a non-fluctuating (Swerling 0)
+    target in a linear detector with ``n_pulses`` non-coherently integrated.
+    It exists here for one purpose: to give the measured integration gains an
+    external reference, so that agreement is a check on the whole chain --
+    simulator, detector, calibration and metric -- rather than a claim about
+    this harness alone.
+
+    Returns None outside the range the approximation is stated for, rather
+    than an unmarked extrapolation.
+    """
+    if not (ALBERSHEIM_PD[0] <= pd <= ALBERSHEIM_PD[1]):
+        return None
+    if not (ALBERSHEIM_PFA[0] <= pfa <= ALBERSHEIM_PFA[1]):
+        return None
+    if not (ALBERSHEIM_N[0] <= n_pulses <= ALBERSHEIM_N[1]):
+        return None
+    a = math.log(0.62 / pfa)
+    b = math.log(pd / (1.0 - pd))
+    return (
+        -5.0 * math.log10(n_pulses)
+        + (6.2 + 4.54 / math.sqrt(n_pulses + 0.44)) * math.log10(a + 0.12 * a * b + 1.7 * b)
+    )
+
+
+def noncoherent_gain_db(pd: float, pfa: float, n_pulses: int) -> float | None:
+    """Integration gain of ``n_pulses`` non-coherent looks against a single look."""
+    one = albersheim_snr_db(pd, pfa, 1)
+    many = albersheim_snr_db(pd, pfa, n_pulses)
+    if one is None or many is None:
+        return None
+    return one - many

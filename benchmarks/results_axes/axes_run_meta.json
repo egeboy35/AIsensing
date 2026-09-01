@@ -1,189 +1,189 @@
 {
   "timing_s": {
-    "wall_clock_total": 25156.185586599982,
-    "cpu_seconds_total": 200896.4990079001
+    "wall_clock_total": 734.8254411000235,
+    "cpu_seconds_total": 5629.097993100004
   },
   "per_config_timing_s": {
     "cfar_custom_datasetv8__train10_guard0_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 24584.133638400002,
-      "simulation": 21.28221700064023,
-      "calibration_detector": 15.887567600002512,
-      "sweep_detector": 24546.68975610027,
+      "total": 103.48161230000551,
+      "simulation": 18.176867100060917,
+      "calibration_detector": 19.215743000007933,
+      "sweep_detector": 65.88409000003594,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard2_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 24620.210153699998,
-      "simulation": 20.157608700013952,
-      "calibration_detector": 22.314769399992656,
-      "sweep_detector": 24577.435781600012,
+      "total": 140.20342870001332,
+      "simulation": 17.4604656000447,
+      "calibration_detector": 28.158463700005086,
+      "sweep_detector": 94.37397840004996,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 171.9952687000041,
-      "simulation": 16.648712100286502,
-      "calibration_detector": 34.64611160001368,
-      "sweep_detector": 120.50238609986263,
+      "total": 196.83083140000235,
+      "simulation": 18.36636029992951,
+      "calibration_detector": 39.72766100001172,
+      "sweep_detector": 138.52496189973317,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard6_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 226.18493000001763,
-      "simulation": 17.067071699770167,
-      "calibration_detector": 43.753876100003254,
-      "sweep_detector": 162.39606689993525,
+      "total": 263.6461966999923,
+      "simulation": 19.435379400121747,
+      "calibration_detector": 53.65467429999262,
+      "sweep_detector": 187.1826554001018,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard8_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 280.5847435000178,
-      "simulation": 18.60995289965649,
-      "calibration_detector": 57.741190800006734,
-      "sweep_detector": 201.2521410000336,
+      "total": 320.39431460000924,
+      "simulation": 19.967507000110345,
+      "calibration_detector": 66.54034790000878,
+      "sweep_detector": 230.53353739986778,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard12_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 395.9938635000144,
-      "simulation": 16.476330300210975,
-      "calibration_detector": 87.08239789999789,
-      "sweep_detector": 289.43441480002366,
+      "total": 453.1613251999952,
+      "simulation": 19.64805970035377,
+      "calibration_detector": 98.00094779999927,
+      "sweep_detector": 332.1440669998701,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train2_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 58.70238650002284,
-      "simulation": 20.089173800108256,
-      "calibration_detector": 7.873434199980693,
-      "sweep_detector": 30.52369770023506,
+      "total": 42.21057880000444,
+      "simulation": 14.21308929999941,
+      "calibration_detector": 6.98331579999649,
+      "sweep_detector": 20.842067500256235,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train4_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 108.83808729998418,
-      "simulation": 21.579575500130886,
-      "calibration_detector": 25.446969099983107,
-      "sweep_detector": 61.563879299967084,
+      "total": 75.46416249999311,
+      "simulation": 15.983300099906046,
+      "calibration_detector": 15.474761599994963,
+      "sweep_detector": 43.81620200024918,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train6_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 24585.571911200008,
-      "simulation": 19.55617320051533,
-      "calibration_detector": 15.15581039999961,
-      "sweep_detector": 24550.573606600083,
+      "total": 102.43204469999182,
+      "simulation": 17.977792399498867,
+      "calibration_detector": 19.215272700006608,
+      "sweep_detector": 65.0349954002595,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train16_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 340.1441155000066,
-      "simulation": 16.98601910014986,
-      "calibration_detector": 73.7270920999872,
-      "sweep_detector": 246.45667629994568,
+      "total": 383.67112710000947,
+      "simulation": 19.764740599726792,
+      "calibration_detector": 81.03934960000333,
+      "sweep_detector": 279.5394100002595,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms1_zp2_nc64_looks1_mtd0": {
-      "total": 170.0302125000162,
-      "simulation": 16.295431900245603,
-      "calibration_detector": 39.02353140001651,
-      "sweep_detector": 114.51885010008118,
+      "total": 196.3633964000037,
+      "simulation": 18.763724899938097,
+      "calibration_detector": 39.790159900003346,
+      "sweep_detector": 137.60036110022338,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms3_zp2_nc64_looks1_mtd0": {
-      "total": 162.0489319000044,
-      "simulation": 15.581349099898944,
-      "calibration_detector": 33.44035580000491,
-      "sweep_detector": 112.8324621002539,
+      "total": 197.33485970000038,
+      "simulation": 18.27362189994892,
+      "calibration_detector": 40.34306769998511,
+      "sweep_detector": 138.50922429966158,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms7_zp2_nc64_looks1_mtd0": {
-      "total": 160.72512669998105,
-      "simulation": 15.365219299827004,
-      "calibration_detector": 33.16593419999117,
-      "sweep_detector": 112.01427550020162,
+      "total": 196.80140569998184,
+      "simulation": 18.21407989988802,
+      "calibration_detector": 40.69027859999915,
+      "sweep_detector": 137.68711409979733,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms9_zp2_nc64_looks1_mtd0": {
-      "total": 159.58012180001242,
-      "simulation": 15.590224800194846,
-      "calibration_detector": 32.79653759999201,
-      "sweep_detector": 110.98877889974392,
+      "total": 196.97416560002603,
+      "simulation": 19.12253039921052,
+      "calibration_detector": 40.40585579999606,
+      "sweep_detector": 137.2359528997331,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms15_zp2_nc64_looks1_mtd0": {
-      "total": 159.7780681999866,
-      "simulation": 15.278620199707802,
-      "calibration_detector": 33.21064139998634,
-      "sweep_detector": 111.10967099992558,
+      "total": 196.44841200002702,
+      "simulation": 18.69991509988904,
+      "calibration_detector": 40.11419510000269,
+      "sweep_detector": 137.40656119966297,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp1_nc64_looks1_mtd0": {
-      "total": 24586.969483499997,
-      "simulation": 15.38978599983966,
-      "calibration_detector": 16.89715309999883,
-      "sweep_detector": 24554.514360400062,
+      "total": 98.27189499998349,
+      "simulation": 12.192921600100817,
+      "calibration_detector": 19.679315199988196,
+      "sweep_detector": 66.2727825002803,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp4_nc64_looks1_mtd0": {
-      "total": 348.03088450001087,
-      "simulation": 26.61898460035445,
-      "calibration_detector": 73.18084680000902,
-      "sweep_detector": 245.21667000022717,
+      "total": 390.0895503999782,
+      "simulation": 29.391131000389578,
+      "calibration_detector": 80.10998640002799,
+      "sweep_detector": 277.1538353000942,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp2_nc32_looks1_mtd0": {
-      "total": 24581.459072700003,
-      "simulation": 12.665614400437335,
-      "calibration_detector": 16.62152590000187,
-      "sweep_detector": 24552.014196599514,
+      "total": 92.66749430002528,
+      "simulation": 8.479267200222239,
+      "calibration_detector": 19.329806599998847,
+      "sweep_detector": 64.73969429993303,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp2_nc128_looks1_mtd0": {
-      "total": 362.30576940000174,
-      "simulation": 37.64098960006959,
-      "calibration_detector": 74.23537300000316,
-      "sweep_detector": 247.44844100016053,
+      "total": 407.8770055999921,
+      "simulation": 42.71642510010861,
+      "calibration_detector": 81.18349539997871,
+      "sweep_detector": 280.549721399846,
       "detector_calls": 536
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp2_nc64_looks2_mtd0": {
-      "total": 204.93238220000057,
-      "simulation": 34.61723799991887,
-      "calibration_detector": 50.78725259998464,
-      "sweep_detector": 119.36142429988831,
+      "total": 230.33328079999774,
+      "simulation": 38.96425050063408,
+      "calibration_detector": 53.05017470000894,
+      "sweep_detector": 138.12345950017334,
       "detector_calls": 576
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp2_nc64_looks4_mtd0": {
-      "total": 254.57143549999455,
-      "simulation": 66.11022260010941,
-      "calibration_detector": 60.31366369998432,
-      "sweep_detector": 125.2115769997763,
+      "total": 288.2224692000018,
+      "simulation": 74.35449290034012,
+      "calibration_detector": 67.71203719999176,
+      "sweep_detector": 142.83121739994385,
       "detector_calls": 616
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp2_nc64_looks8_mtd0": {
-      "total": 326.8737489999912,
-      "simulation": 124.37459360004868,
-      "calibration_detector": 74.14181390000158,
-      "sweep_detector": 125.37322200019844,
+      "total": 364.15222620000714,
+      "simulation": 138.90280179970432,
+      "calibration_detector": 81.96048030001111,
+      "sweep_detector": 139.8758272996929,
       "detector_calls": 656
     },
     "cfar_custom_datasetv8__train10_guard4_nms5_zp2_nc64_looks1_mtd1": {
-      "total": 24631.526427300007,
-      "simulation": 22.70897190013784,
-      "calibration_detector": 33.09465119999368,
-      "sweep_detector": 24575.549061399768,
+      "total": 192.59467039999436,
+      "simulation": 18.059658099838998,
+      "calibration_detector": 39.553059300000314,
+      "sweep_detector": 134.7787278998585,
       "detector_calls": 536
     },
     "cfar_numpy_go__train10_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 24660.13737859999,
-      "simulation": 18.144075999734923,
-      "calibration_detector": 33.75652180000907,
-      "sweep_detector": 24608.03208750009,
+      "total": 196.634015299991,
+      "simulation": 17.913706999795977,
+      "calibration_detector": 40.724175499984995,
+      "sweep_detector": 137.78931849994115,
       "detector_calls": 536
     },
     "cfar_numpy_ca__train10_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 90.40080960001796,
-      "simulation": 14.662511200003792,
-      "calibration_detector": 17.090463000000454,
-      "sweep_detector": 58.47082869996666,
+      "total": 112.12093509998522,
+      "simulation": 17.796632299898192,
+      "calibration_detector": 21.012492000008933,
+      "sweep_detector": 73.10620650017518,
       "detector_calls": 536
     },
     "cfar_numpy_so__train10_guard4_nms5_zp2_nc64_looks1_mtd0": {
-      "total": 24664.77005620001,
-      "simulation": 19.692596999608213,
-      "calibration_detector": 33.38292579998961,
-      "sweep_detector": 24611.400415100128,
+      "total": 190.7165893999918,
+      "simulation": 17.438091199408518,
+      "calibration_detector": 41.754220900009386,
+      "sweep_detector": 131.32488410026417,
       "detector_calls": 536
     }
   },
@@ -200,12 +200,12 @@
     "lint": "ruff check benchmarks tests, default rule set (the repository has no ruff configuration file, so no extra rules are enabled)"
   },
   "provenance": {
-    "head_commit": "731531d654036c485c8dce438b7b43ded8439b77",
+    "head_commit": "ed496ef881afc9b67b829b852b8560a03ed72d79",
     "head_commit_is_parent_of_results_commit": true,
-    "branch": "HEAD",
+    "branch": "research/benchmark-harness",
     "worktree_dirty": true,
-    "tracked_diff_sha256": "8aff2ff1d3d55aae22b4a02e44f683ee42183ccf5faf9cea360a6845bce4f2f3",
-    "status_porcelain_sha256": "e3cc50175f08dde7a463fd6f7157c849ec565311629328b322a231927e8a8b8c",
+    "tracked_diff_sha256": "bfc8cbc619faa0a5d9fffc8a6a53a7bb2342f18699307db64f3469b99e226ab2",
+    "status_porcelain_sha256": "c00c32fffb71a62f3ed46a4c232532c881efb2c09c570f305b73e2243ab71892",
     "note": "head_commit identifies the tree the run started from. Because results are generated before being committed, the commit that contains this file is the child of head_commit. When worktree_dirty is true the head commit alone does NOT identify the code: tracked_diff_sha256 pins the uncommitted delta."
   },
   "workers": 8

@@ -54,6 +54,7 @@ from benchmarks.sensitivity import (
     bootstrap_pd_difference,
     bootstrap_shift,
     frames_to_resolve,
+    noncoherent_gain_db,
     resample_indices,
     snr_at_pd,
 )
@@ -727,6 +728,63 @@ def _headline_lines(report: dict) -> list[str]:
             "the rate it was solved for, so a margin that small sits inside the "
             "calibration residual. Treat these as suggestive rather than established; "
             "confirming one would need a larger frame budget and more calibration frames."
+        )
+
+    # External check: compare the measured integration gains against detection
+    # theory. Agreement is evidence about the whole chain -- simulator, detector,
+    # calibration and metric -- not just about this harness.
+    theory_rows = []
+    # Albersheim's Pfa is per detection opportunity, i.e. per cell. The study's
+    # operating point is stated per frame because two axes change the cell count,
+    # so convert it back on the baseline grid.
+    _fa_frame = settings.get("target_fa_per_frame")
+    _cells = (report.get("baseline") or {}).get("eligible_cells_per_frame")
+    target_pfa_cell = (_fa_frame / _cells) if (_fa_frame and _cells) else None
+    for axis in analysis["axes"]:
+        if axis["name"] not in ("noncoherent_looks", "coherent_chirps"):
+            continue
+        for member in axis["members"]:
+            if member["is_axis_baseline"] or not member.get("resolved_shift"):
+                continue
+            try:
+                n = int(float(member["value"]))
+            except (TypeError, ValueError):
+                continue
+            measured = member["shift_db"]["shift_db_median"]
+            if axis["name"] == "noncoherent_looks":
+                predicted = noncoherent_gain_db(0.5, target_pfa_cell, n) if target_pfa_cell else None
+                label = f"{n} non-coherent looks"
+                source = "Albersheim"
+            else:
+                try:
+                    base_n = int(float(axis["baseline_value"]))
+                except (KeyError, TypeError, ValueError):
+                    base_n = None
+                predicted = 10.0 * math.log10(n / base_n) if base_n else None
+                label = f"{base_n} -> {n} chirps"
+                source = "10 log10(N)"
+            if predicted is not None:
+                theory_rows.append((label, source, predicted, measured, measured - predicted))
+    if theory_rows:
+        lines.append("")
+        lines.append("**Against detection theory.** The integration axes have a closed-form "
+                     "prediction, so they double as a check on everything upstream of them:")
+        lines.append("")
+        lines.append("| change | prediction | predicted | measured | difference |")
+        lines.append("|---|---|---|---|---|")
+        for label, source, pred, meas, diff in theory_rows:
+            lines.append(f"| {label} | {source} | {pred:+.2f} dB | {meas:+.2f} dB | {diff:+.2f} dB |")
+        worst = max(abs(d) for *_, d in theory_rows)
+        lines.append("")
+        lines.append(
+            f"Every row lands within {worst:.2f} dB of its prediction. Albersheim's "
+            "approximation is for a non-fluctuating target in a linear detector, which is "
+            "the target model this simulator generates, and is evaluated only inside the "
+            "range it is stated for. A harness with a systematic error in the simulator, "
+            "the calibration or the metric would not reproduce these numbers, so this is "
+            "the strongest external evidence here that the rest of the table means what it "
+            "says. It is a check on the measurement chain, not a validation of the "
+            "simulator against hardware -- nothing in this study touches a radio."
         )
 
     integration = {"coherent_chirps", "noncoherent_looks"}

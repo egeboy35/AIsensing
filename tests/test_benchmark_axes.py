@@ -474,3 +474,45 @@ def test_measure_config_is_reproducible_and_calibrates_to_the_requested_rate(rep
     )
     assert first["association"]["gate_range_bins"] == 2
     assert first["association"]["gate_doppler_bins"] == 1
+
+
+def test_albersheim_matches_a_hand_computed_point():
+    """Pin the closed form against arithmetic a reader can redo on paper.
+
+    For Pd = 0.5 the logit term B = ln(0.5/0.5) = 0, so the expression collapses
+    to -5 log10(N) + (6.2 + 4.54/sqrt(N + 0.44)) * log10(ln(0.62/Pfa)), which is
+    short enough to check by hand.
+    """
+    import math
+
+    from benchmarks.sensitivity import albersheim_snr_db
+
+    pfa = 1e-4
+    a = math.log(0.62 / pfa)
+    for n in (1, 8):
+        expected = -5.0 * math.log10(n) + (6.2 + 4.54 / math.sqrt(n + 0.44)) * math.log10(a)
+        assert abs(albersheim_snr_db(0.5, pfa, n) - expected) < 1e-9
+
+
+def test_albersheim_refuses_to_extrapolate():
+    """Outside the range the approximation is stated for it must return None,
+    not an unmarked number that a reader would take as a prediction."""
+    from benchmarks.sensitivity import albersheim_snr_db
+
+    assert albersheim_snr_db(0.99, 1e-4, 8) is None      # Pd above 0.9
+    assert albersheim_snr_db(0.5, 1e-9, 8) is None       # Pfa below 1e-7
+    assert albersheim_snr_db(0.5, 1e-4, 100000) is None  # N above 8096
+    assert albersheim_snr_db(0.5, 1e-4, 8) is not None   # inside the range
+
+
+def test_noncoherent_gain_is_positive_and_sublinear():
+    """Non-coherent integration must gain, but less than the 10 log10(N) a
+    coherent sum would give -- that ordering is the physical content."""
+    import math
+
+    from benchmarks.sensitivity import noncoherent_gain_db
+
+    for n in (2, 4, 8):
+        gain = noncoherent_gain_db(0.5, 1e-4, n)
+        assert gain is not None
+        assert 0.0 < gain < 10.0 * math.log10(n), (n, gain)
