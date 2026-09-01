@@ -419,7 +419,7 @@ def cfar_2d_pytorch(
 
 
     def compute_thresholds(mag_db):
-        """
+        r"""
         Compute CFAR noise threshold using different methods.
 
         CA-CFAR:
