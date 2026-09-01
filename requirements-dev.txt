@@ -1,0 +1,9 @@
+# Development/test dependencies for the tests/ suite.
+# torch is optional: torch-dependent tests skip cleanly without it.
+# CI installs the CPU wheel separately:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+numpy
+scipy
+matplotlib
+pytest
+ruff
