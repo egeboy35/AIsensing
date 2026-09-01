@@ -13,6 +13,11 @@ import adi
 import mycn0566 as mycn0566
 from phaser_functions import save_hb100_cal, spec_est
 from scipy import signal
+# The filter file sits beside this script. Anchoring on __file__ instead of a
+# path relative to the working directory keeps it loadable from any cwd and
+# on any OS: "sdradi\phaser\x" is a directory path only on Windows, and
+# only when the process was started from the repository root.
+_HERE = os.path.dirname(os.path.abspath(__file__))
 
 CN0566=mycn0566.CN0566
 
@@ -74,7 +79,7 @@ my_sdr.rx_hardwaregain_chan1 = 0  # dB
 my_sdr.rx_lo = int(2.0e9)  # Downconvert by 2GHz  # Receive Freq
 
 #my_sdr.filter = "LTE20_MHz.ftr"  # Handy filter for fairly widdeband measurements
-my_sdr.filter = "sdradi\phaser\LTE20_MHz.ftr"  # Handy filter for fairly widdeband measurements
+my_sdr.filter = os.path.join(_HERE, "LTE20_MHz.ftr")  # Handy filter for fairly widdeband measurements
 
 # Make sure the Tx channels are attenuated (or off) and their freq is far away from Rx
 # this is a negative number between 0 and -88

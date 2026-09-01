@@ -3,6 +3,7 @@
 
 # cal - perform both gain and phase calibration, save to files.
 
+import os
 import sys
 import time
 from time import sleep
@@ -21,6 +22,11 @@ from phaser_functions import (
     phase_calibration,
 )
 from scipy import signal
+# The filter file sits beside this script. Anchoring on __file__ instead of a
+# path relative to the working directory keeps it loadable from any cwd and
+# on any OS: "sdradi\phaser\x" is a directory path only on Windows, and
+# only when the process was started from the repository root.
+_HERE = os.path.dirname(os.path.abspath(__file__))
 
 try:
     import config_custom as config  # this has all the key parameters that the user would want to change (i.e. calibration phase and antenna element spacing)
@@ -134,7 +140,7 @@ except:
 
 #  Configure SDR parameters.
 
-my_sdr.filter = "sdradi\phaser\LTE20_MHz.ftr" #"LTE20_MHz.ftr"  # Load LTE 20 MHz filter
+my_sdr.filter = os.path.join(_HERE, "LTE20_MHz.ftr") #"LTE20_MHz.ftr"  # Load LTE 20 MHz filter
 
 
 # use_tx = config.use_tx

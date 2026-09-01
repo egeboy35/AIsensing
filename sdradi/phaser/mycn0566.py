@@ -1,4 +1,5 @@
 
+import os
 import pickle
 from time import sleep
 
@@ -6,6 +7,18 @@ import adi
 import numpy as np
 from adi.adar1000 import adar1000_array
 from adi.adf4159 import adf4159
+
+# The data files this module ships with -- the calibration pickles and the
+# SDR filter -- sit beside it. Anchoring on __file__ instead of on a path
+# relative to the working directory keeps them loadable from any cwd and on
+# any OS: "sdradi\phaser\x" is a directory path only on Windows,
+# and only when the process was started from the repository root.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _default_cal_path(filename, name):
+    """Fall back to the copy of `name` that ships next to this module."""
+    return os.path.join(_HERE, name) if filename is None else filename
 
 #ref: https://github.com/analogdevicesinc/pyadi-iio/blob/main/adi/cn0566.py
 class CN0566(adf4159, adar1000_array):
@@ -303,25 +316,28 @@ class CN0566(adf4159, adar1000_array):
             elif self.device_mode == "tx":
                 device.latch_tx_settings()  # writes 0x02 to reg 0x28.
 
-    def save_channel_cal(self, filename="channel_cal_val.pkl"):
+    def save_channel_cal(self, filename=None):
         """ Saves channel calibration file."""
+        filename = _default_cal_path(filename, "channel_cal_val.pkl")
         with open(filename, "wb") as file1:
             pickle.dump(self.ccal, file1)  # save calibrated gain value to a file
             file1.close()
 
-    def save_gain_cal(self, filename="gain_cal_val.pkl"):
+    def save_gain_cal(self, filename=None):
         """ Saves gain calibration file."""
+        filename = _default_cal_path(filename, "gain_cal_val.pkl")
         with open(filename, "wb") as file1:
             pickle.dump(self.gcal, file1)  # save calibrated gain value to a file
             file1.close()
 
-    def save_phase_cal(self, filename="phase_cal_val.pkl"):
+    def save_phase_cal(self, filename=None):
         """ Saves phase calibration file."""
+        filename = _default_cal_path(filename, "phase_cal_val.pkl")
         with open(filename, "wb") as file:
             pickle.dump(self.pcal, file)  # save calibrated phase value to a file
             file.close()
 
-    def load_channel_cal(self, filename="sdradi\phaser\channel_cal_val.pkl"):
+    def load_channel_cal(self, filename=None):
         """
         Load channel gain compensation values, if not calibrated set all to 0.
 
@@ -330,6 +346,7 @@ class CN0566(adf4159, adar1000_array):
         filename: string
             Path/name of channel calibration file
         """
+        filename = _default_cal_path(filename, "channel_cal_val.pkl")
         try:
             with open(filename, "rb") as file:
                 self.ccal = pickle.load(file)  # Load gain cal values
@@ -338,7 +355,7 @@ class CN0566(adf4159, adar1000_array):
             print("file not found, loading default (no channel gain compensation)")
             self.ccal = [0.0] * 2
 
-    def load_gain_cal(self, filename="sdradi\phaser\gain_cal_val.pkl"):
+    def load_gain_cal(self, filename=None):
         """Load gain calibrated value, if not calibrated set all channel gain to maximum.
 
         Parameters
@@ -346,6 +363,7 @@ class CN0566(adf4159, adar1000_array):
         filename: type=string
             Provide path of gain calibration file
         """
+        filename = _default_cal_path(filename, "gain_cal_val.pkl")
         try:
             with open(filename, "rb") as file1:
                 self.gcal = pickle.load(file1)  # Load gain cal values
@@ -354,7 +372,7 @@ class CN0566(adf4159, adar1000_array):
             print("file not found, loading default (all gain at maximum)")
             self.gcal = [1.0] * 8  # .append(0x7F)
 
-    def load_phase_cal(self, filename="sdradi\phaser\phase_cal_val.pkl"):
+    def load_phase_cal(self, filename=None):
         """Load phase calibrated value, if not calibrated set all channel phase correction to 0.
 
         Parameters
@@ -362,6 +380,7 @@ class CN0566(adf4159, adar1000_array):
         filename: type=string
             Provide path of phase calibration file
         """
+        filename = _default_cal_path(filename, "phase_cal_val.pkl")
         try:
             with open(filename, "rb") as file:
                 self.pcal = pickle.load(file)  # Load gain cal values
@@ -575,7 +594,7 @@ class CN0566(adf4159, adar1000_array):
         #     "LTE20_MHz.ftr"  # Handy filter for fairly widdeband measurements
         # )
         self.sdr.filter = (
-            "sdradi\phaser\LTE20_MHz.ftr"  # Handy filter for fairly widdeband measurements
+            os.path.join(_HERE, "LTE20_MHz.ftr")  # Handy filter for fairly widdeband measurements
         )
         # sdr.filter = "/usr/local/lib/osc/filters/LTE5_MHz.ftr"
         # sdr.rx_rf_bandwidth = int(SampleRate*2)
