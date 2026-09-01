@@ -14,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -170,11 +169,6 @@ cython_debug/
 /WebApp/WebAppFrontend/node_modules/*
 node_modules/
 *.pyc
-__pycache__/
-*.egg-info/
-build/
-dist/
-.env
 AIRadar/unused
 AIRadar/writing
 AIRadar/data
@@ -192,15 +186,19 @@ sdradi/pluto_test/test_video.mp4
 sdradi/output
 *.h5
 sdradi/recovered.bin
+tx_log.txt
+upload_log.txt
 
-rf_stream/rf_stream_rx_runs
-rf_stream/rf_stream_rx_runs/
+# MATLAB/Simulink generated cache
+slprj/
+
 *.bin
-rf_stream_rx_runs/run_20260427_112119/captures.csv
 
 rf_stream/stage2_out_xgb
 rf_stream/ber_sweep*
 *.pt
+*.pth
+*.ckpt
 *.onnx
 rf_stream/airlink/*
 *.npz
