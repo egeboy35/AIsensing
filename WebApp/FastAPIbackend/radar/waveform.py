@@ -1,13 +1,19 @@
+import os
+import sys
+
 import numpy as np
 try:
     import plotly.graph_objects as go
-except ImportError:
-    # If plotly is not installed, install it using pip
-    import subprocess
-    import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "plotly"])
-    import plotly.graph_objects as go
+except ImportError as exc:
+    raise ImportError(
+        "plotly is required to generate waveform plots. "
+        "Install it with: python -m pip install plotly"
+    ) from exc
 from typing import Dict, Any, Tuple
+
+# Make the repository root importable so that the AIRadar package can be
+# found when this module is used from WebApp/FastAPIbackend/.
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 from AIRadar.AIRadarLib.datautil import calculate_radar_parameters
 from AIRadar.AIRadarLib.waveform_utils import (
     generate_linear_chirp,

@@ -7,7 +7,16 @@ import matplotlib.pyplot as plt
 plt.rcParams['font.size'] = 8.0
 from matplotlib import colors
 
-from tfmodules import MyLMMSEEqualizer, LMMSEEqualizer, SymbolLogits2LLRs
+# `tfmodules` (located in sdradi/pluto_test/) requires TensorFlow. Import it
+# optionally so this module can be used without TensorFlow; only the
+# components that need it (e.g. MyDemapper) raise a clear error when it is
+# missing.
+try:
+    from tfmodules import MyLMMSEEqualizer, LMMSEEqualizer, SymbolLogits2LLRs
+except ImportError:
+    MyLMMSEEqualizer = None
+    LMMSEEqualizer = None
+    SymbolLogits2LLRs = None
 
 #Ref: deeplearning\ofdmsim2.py, create simple OFDM signal
 class OFDMSymbol():
@@ -888,6 +897,14 @@ class MyDemapper:
                  #dtype=tf.complex64,
                  #**kwargs
                 ):
+        if SymbolLogits2LLRs is None:
+            raise ImportError(
+                "MyDemapper requires SymbolLogits2LLRs from the optional "
+                "'tfmodules' module (see sdradi/pluto_test/tfmodules.py), "
+                "which depends on TensorFlow. Install TensorFlow and make "
+                "tfmodules importable (e.g. add sdradi/pluto_test to "
+                "PYTHONPATH) to use this class."
+            )
         self.points = CreateConstellation(constellation_type, num_bits_per_symbol) #(16,) complex
         self.num_bits_per_symbol = num_bits_per_symbol #4
         self.with_prior = with_prior #False

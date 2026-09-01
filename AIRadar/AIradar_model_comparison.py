@@ -14,7 +14,7 @@ from sklearn.metrics import precision_recall_curve, average_precision_score, roc
 # Import custom modules
 from AIradar_datasetv4 import RadarDataset
 from AIradar_processing import RadarProcessing
-from AIradar_transformer import RadarTransformerNet
+from AIRadarLib.modeling_transformer import RadarTransformerNet
 
 # Import other models for comparison
 import sys
