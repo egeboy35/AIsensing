@@ -9,6 +9,13 @@ lies inside a rectangular gate of +/-``gate_range_bins`` range bins and
 +/-``gate_doppler_bins`` Doppler bins around the target's nearest-bin position,
 and matching is one-to-one, assigned greedily in order of increasing normalized
 gate distance.
+
+Consequence worth stating out loud: *every* in-gate detection beyond the one
+matched pair is counted as a false positive.  Target sidelobes that survive
+non-maximum suppression inside a target's own neighbourhood are therefore
+reported as false alarms, not merged into the detection.  :func:`associate`
+accepts an optional wider "near" gate purely so that this component can be
+measured and reported separately -- it does not change any TP/FP/FN count.
 """
 
 from __future__ import annotations
@@ -45,6 +52,10 @@ class FrameResult:
     matches: list[Match] = field(default_factory=list)
     unmatched_targets: list[int] = field(default_factory=list)
     unmatched_detections: list[int] = field(default_factory=list)
+    #: Subset of ``unmatched_detections`` that lies inside the wider "near"
+    #: neighbourhood of some ground-truth target (target sidelobes and split
+    #: peaks).  Empty when no near gate was supplied.  Diagnostic only.
+    near_target_false_positives: list[int] = field(default_factory=list)
 
     @property
     def true_positives(self) -> int:
@@ -57,6 +68,14 @@ class FrameResult:
     @property
     def false_positives(self) -> int:
         return len(self.unmatched_detections)
+
+    @property
+    def false_positives_near_target(self) -> int:
+        return len(self.near_target_false_positives)
+
+    @property
+    def false_positives_far_from_target(self) -> int:
+        return len(self.unmatched_detections) - len(self.near_target_false_positives)
 
 
 def gate_distance(
@@ -86,6 +105,8 @@ def associate(
     detections: list[Point],
     gate_range_bins: int = 2,
     gate_doppler_bins: int = 1,
+    near_range_bins: int | None = None,
+    near_doppler_bins: int | None = None,
 ) -> FrameResult:
     """One-to-one greedy association of detections to ground-truth targets.
 
@@ -93,9 +114,20 @@ def associate(
     ``(gate_distance, target_index, detection_index)`` and accepted while both
     endpoints are still free.  Errors are measured against the target's
     *continuous* range/velocity, not its quantized bin centre.
+
+    ``near_range_bins`` / ``near_doppler_bins`` define an optional wider
+    rectangle, used only to split the false positives into "near a target"
+    (sidelobe / split-peak residue) and "far from any target".  Supplying them
+    changes no TP/FP/FN count.
     """
     if gate_range_bins < 0 or gate_doppler_bins < 0:
         raise ValueError("gate sizes must be non-negative")
+    if (near_range_bins is None) != (near_doppler_bins is None):
+        raise ValueError("near_range_bins and near_doppler_bins must be given together")
+    if near_range_bins is not None and (
+        near_range_bins < gate_range_bins or near_doppler_bins < gate_doppler_bins
+    ):
+        raise ValueError("the near gate must be at least as large as the association gate")
 
     candidates = []
     for ti, target in enumerate(targets):
@@ -125,12 +157,27 @@ def associate(
             )
         )
 
+    unmatched_detections = [
+        i for i in range(len(detections)) if i not in taken_detections
+    ]
+    near: list[int] = []
+    if near_range_bins is not None and targets:
+        for di in unmatched_detections:
+            detection = detections[di]
+            for target in targets:
+                dr = abs(int(detection.range_bin) - int(target.range_bin))
+                dd = abs(int(detection.doppler_bin) - int(target.doppler_bin))
+                if dr <= near_range_bins and dd <= near_doppler_bins:
+                    near.append(di)
+                    break
+
     return FrameResult(
         num_targets=len(targets),
         num_detections=len(detections),
         matches=matches,
         unmatched_targets=[i for i in range(len(targets)) if i not in taken_targets],
-        unmatched_detections=[i for i in range(len(detections)) if i not in taken_detections],
+        unmatched_detections=unmatched_detections,
+        near_target_false_positives=near,
     )
 
 
@@ -146,6 +193,9 @@ def aggregate(frames: list[FrameResult], eligible_cells_per_frame: int) -> dict:
 
     * ``pd`` -- probability of detection: total TP / total ground-truth targets.
     * ``false_alarms_per_frame`` -- total FP / number of frames.
+    * ``false_positives_near_target`` -- how many of those FPs sit inside the wider
+      "near" gate of a ground-truth target, i.e. are target sidelobes or split peaks
+      rather than noise peaks.  Zero unless ``associate`` was given a near gate.
     * ``false_alarm_rate_per_cell`` -- total FP / (frames * eligible cells).  This
       counts *post-NMS peaks*, not raw threshold crossings, so it is a peak-level
       false-alarm density and is NOT directly comparable to a CFAR design Pfa.
@@ -158,6 +208,7 @@ def aggregate(frames: list[FrameResult], eligible_cells_per_frame: int) -> dict:
     total_targets = sum(f.num_targets for f in frames)
     total_tp = sum(f.true_positives for f in frames)
     total_fp = sum(f.false_positives for f in frames)
+    total_fp_near = sum(f.false_positives_near_target for f in frames)
     total_fn = sum(f.false_negatives for f in frames)
     total_detections = sum(f.num_detections for f in frames)
 
@@ -170,6 +221,8 @@ def aggregate(frames: list[FrameResult], eligible_cells_per_frame: int) -> dict:
         "detections": total_detections,
         "true_positives": total_tp,
         "false_positives": total_fp,
+        "false_positives_near_target": total_fp_near,
+        "false_positives_far_from_target": total_fp - total_fp_near,
         "false_negatives": total_fn,
         "pd": (total_tp / total_targets) if total_targets else float("nan"),
         "precision": (total_tp / total_detections) if total_detections else float("nan"),

@@ -197,7 +197,19 @@ class Frame:
     targets: tuple[GroundTruthTarget, ...]
     snr_db: float
     trial: int
-    peak_snr_db: float  # measured target-peak-to-noise-floor in the RD map
+    peak_snr_db: float  # max-in-window peak minus median noise floor; FLOORS, see below
+    #: Noise-subtracted target-bin power ratio, linear.  ``nan`` with no targets.
+    #: Unlike ``peak_snr_db`` this does not floor at the noise maximum: it is an
+    #: unbiased estimate of (target power)/(noise+clutter power) and goes to ~0 as
+    #: the target vanishes, so it can be averaged in the linear domain and stays
+    #: monotone in the requested SNR.
+    target_bin_snr_linear: float = float("nan")
+    #: dB added to the requested ``snr_db`` before it was handed to the repo
+    #: simulator, to reference the noise to target-only power instead of whole-scene
+    #: power.  0.0 for the repo's own convention.
+    snr_correction_db: float = 0.0
+    #: ``"full"``, ``"noise_only"`` or ``"clutter_only"``.
+    kind: str = "full"
 
 
 def _seed_globals(*key: int) -> None:
@@ -211,6 +223,38 @@ def _seed_globals(*key: int) -> None:
     seed = int(np.random.SeedSequence(list(key)).generate_state(1, dtype=np.uint32)[0])
     np.random.seed(seed)
     random.seed(seed)
+
+
+def rd_map_from_beat(params: RadarParams, beat_rx: np.ndarray) -> np.ndarray:
+    """Range-Doppler complex map from a multi-RX beat cube.
+
+    Byte-for-byte the FFT chain of ``AIRadarDataset.simulate_fmcw_signal``, kept
+    separately only because the repo function returns the dB magnitude and throws
+    the complex map away.  :func:`simulate_frame` asserts that
+    ``20*log10(|this| + 1e-6)`` reproduces the repo's own dB map exactly, which is
+    what makes the replication trustworthy; the same chain is then reused for the
+    target-free calibration frames, which the repo function cannot produce (it adds
+    no noise at all when the scene is empty, because it scales the noise by the
+    scene power).
+    """
+    beat_sum = np.sum(beat_rx, axis=0)
+    range_fft = np.fft.fft(beat_sum, n=params.zero_pad, axis=1)[:, : params.zero_pad // 2]
+    doppler_fft = np.fft.fftshift(np.fft.fft(range_fft, axis=0), axes=0)
+    return doppler_fft[:, : params.num_range_bins]
+
+
+def detector_input_from_rd(rd_complex: np.ndarray) -> np.ndarray:
+    """Pack a complex RD map into the ``[1, 2, doppler, range]`` layout the repo
+    detectors in ``radar_det.py`` expect."""
+    detector_input = np.empty((1, 2, *rd_complex.shape), dtype=np.float64)
+    detector_input[0, 0] = rd_complex.real
+    detector_input[0, 1] = rd_complex.imag
+    return detector_input
+
+
+def repo_db_map(rd_complex: np.ndarray) -> np.ndarray:
+    """The repo's own dB-magnitude convention, ``20*log10(|x| + 1e-6)``."""
+    return 20 * np.log10(np.abs(rd_complex) + 1e-6)
 
 
 def quantize_to_bins(params: RadarParams, range_m: float, velocity_mps: float) -> tuple[int, int]:
@@ -257,42 +301,78 @@ def clutter_to_target_power_db(params: RadarParams, trials: int, base_seed: int)
     return float(10 * np.log10(np.mean(ratios)))
 
 
-def simulate_frame(
-    params: RadarParams,
-    trial: int,
-    snr_index: int,
-    snr_db: float,
-    base_seed: int,
-) -> Frame:
-    """Simulate one frame with the repo's FMCW model and build detector inputs."""
+#: Values accepted by the ``snr_reference`` argument.
+SNR_REFERENCES = ("scene", "target")
+
+
+@dataclass(frozen=True)
+class SceneReference:
+    """Noise-free beat cubes for one drawn scene, and the powers derived from them.
+
+    ``simulate_fmcw_signal`` sets the AWGN variance to
+    ``mean(|windowed beat over the WHOLE scene|^2) / 10**(snr_db/10)``.  With clutter
+    enabled, "the whole scene" includes the clutter and the TX-coupling return, so
+    raising the clutter RCS raises the injected noise as well and the requested
+    ``snr_db`` is not the primary target's SNR.  Recovering the primary target's own
+    reference power needs a second, target-only, noise-free simulation -- which is
+    exactly what this holder caches.
+
+    Both cubes come from the repo simulator called with ``snr_db=inf`` (noise power
+    ``signal_power / inf == 0.0``, so the AWGN term is identically zero).  The
+    simulator is linear in the target list for the configs benchmarked here
+    (``num_rx=1``, ``use_array_factor=False``, ``hardware_model='generic'``), which a
+    test verifies, so ``beat_all - beat_primary`` is exactly the clutter-plus-coupling
+    contribution.
+    """
+
+    beat_all: np.ndarray
+    beat_primary: np.ndarray
+    power_all: float
+    power_primary: float
+
+    @property
+    def scene_to_target_power_db(self) -> float:
+        """dB by which whole-scene mean power exceeds primary-target-only mean power.
+
+        This is exactly the amount by which the repo's scene-referenced convention
+        inflates the injected noise relative to a target-referenced one, so adding it
+        to the requested ``snr_db`` holds the primary target's SNR fixed.
+        """
+        if self.power_primary <= 0:
+            return 0.0
+        return float(10 * np.log10(self.power_all / self.power_primary))
+
+
+def scene_reference(
+    params: RadarParams, trial: int, base_seed: int
+) -> tuple[list[dict], list[dict], SceneReference]:
+    """Draw one scene and simulate it noise-free, whole-scene and target-only."""
     repo = load_repo_modules()
     dataset_cls = repo["AIRadarDataset"]
-
     targets, sim_targets = draw_scenario(params, trial, base_seed)
 
-    _seed_globals(base_seed, 2, trial, snr_index)
-    beat_rx, rd_map_db = dataset_cls.simulate_fmcw_signal(params, sim_targets, snr_db=snr_db)
+    # Seeded for form only: with snr_db=inf the noise term is identically zero, so
+    # these two calls are deterministic regardless of RNG state.
+    _seed_globals(base_seed, 3, trial)
+    beat_all, _ = dataset_cls.simulate_fmcw_signal(params, sim_targets, snr_db=np.inf)
+    _seed_globals(base_seed, 4, trial)
+    beat_primary, _ = dataset_cls.simulate_fmcw_signal(params, targets, snr_db=np.inf)
 
-    # Same FFT chain as simulate_fmcw_signal, but keeping the complex result --
-    # the repo function only returns the dB magnitude, and cfar_2d_numpy /
-    # cfar_2d_advanced take a complex (real, imag) map.  The equality assertion
-    # below is what makes this replication trustworthy.
-    beat_sum = np.sum(beat_rx, axis=0)
-    range_fft = np.fft.fft(beat_sum, n=params.zero_pad, axis=1)[:, : params.zero_pad // 2]
-    doppler_fft = np.fft.fftshift(np.fft.fft(range_fft, axis=0), axes=0)
-    rd_complex = doppler_fft[:, : params.num_range_bins]
+    return (
+        targets,
+        sim_targets,
+        SceneReference(
+            beat_all=beat_all,
+            beat_primary=beat_primary,
+            power_all=float(np.mean(np.abs(beat_all) ** 2)),
+            power_primary=float(np.mean(np.abs(beat_primary) ** 2)),
+        ),
+    )
 
-    reconstructed_db = 20 * np.log10(np.abs(rd_complex) + 1e-6)
-    if not np.allclose(reconstructed_db, rd_map_db, rtol=0, atol=1e-9):
-        raise AssertionError(
-            "complex RD map does not reproduce the repo's dB map; the FFT chain "
-            "in simulate_fmcw_signal must have changed"
-        )
 
-    detector_input = np.empty((1, 2, *rd_complex.shape), dtype=np.float64)
-    detector_input[0, 0] = rd_complex.real
-    detector_input[0, 1] = rd_complex.imag
-
+def _ground_truth(
+    params: RadarParams, targets: list[dict]
+) -> tuple[GroundTruthTarget, ...]:
     gt = []
     for t in targets:
         r_bin, d_bin = quantize_to_bins(params, t["range"], t["velocity"])
@@ -305,16 +385,172 @@ def simulate_frame(
                 doppler_bin=d_bin,
             )
         )
+    return tuple(gt)
+
+
+def _resolve_correction(reference: SceneReference, snr_reference: str) -> float:
+    if snr_reference not in SNR_REFERENCES:
+        raise ValueError(
+            f"snr_reference must be one of {SNR_REFERENCES}, got {snr_reference!r}"
+        )
+    if snr_reference == "scene":
+        return 0.0
+    return reference.scene_to_target_power_db
+
+
+def simulate_frame(
+    params: RadarParams,
+    trial: int,
+    snr_index: int,
+    snr_db: float,
+    base_seed: int,
+    snr_reference: str = "scene",
+    reference: SceneReference | None = None,
+) -> Frame:
+    """Simulate one frame with the repo's FMCW model and build detector inputs.
+
+    ``snr_reference="scene"`` reproduces the repo exactly: the requested ``snr_db``
+    is measured against whole-scene power.  ``snr_reference="target"`` adds
+    :attr:`SceneReference.scene_to_target_power_db` to the requested value before
+    calling the simulator, so that the *primary target's* SNR is what the sweep axis
+    means and the clutter axis stops doubling as an SNR axis.  Nothing in the repo is
+    modified either way; only the number handed to ``snr_db`` changes.
+    """
+    repo = load_repo_modules()
+    dataset_cls = repo["AIRadarDataset"]
+
+    if reference is None:
+        targets, sim_targets, reference = scene_reference(params, trial, base_seed)
+    else:
+        targets, sim_targets = draw_scenario(params, trial, base_seed)
+
+    correction_db = _resolve_correction(reference, snr_reference)
+
+    _seed_globals(base_seed, 2, trial, snr_index)
+    beat_rx, rd_map_db = dataset_cls.simulate_fmcw_signal(
+        params, sim_targets, snr_db=snr_db + correction_db
+    )
+
+    rd_complex = rd_map_from_beat(params, beat_rx)
+    reconstructed_db = repo_db_map(rd_complex)
+    if not np.allclose(reconstructed_db, rd_map_db, rtol=0, atol=1e-9):
+        raise AssertionError(
+            "complex RD map does not reproduce the repo's dB map; the FFT chain "
+            "in simulate_fmcw_signal must have changed"
+        )
+
+    gt = _ground_truth(params, targets)
 
     return Frame(
         rd_map_complex=rd_complex,
         rd_map_db=rd_map_db,
-        rd_map_detector_input=detector_input,
-        targets=tuple(gt),
+        rd_map_detector_input=detector_input_from_rd(rd_complex),
+        targets=gt,
         snr_db=float(snr_db),
         trial=trial,
-        peak_snr_db=measure_peak_snr_db(params, rd_map_db, gt),
+        peak_snr_db=measure_peak_snr_db(params, rd_map_db, list(gt)),
+        target_bin_snr_linear=measure_target_bin_snr_linear(rd_complex, list(gt)),
+        snr_correction_db=float(correction_db),
+        kind="full",
     )
+
+
+def simulate_target_free_frame(
+    params: RadarParams,
+    trial: int,
+    snr_index: int,
+    snr_db: float,
+    base_seed: int,
+    kind: str,
+    snr_reference: str = "scene",
+    reference: SceneReference | None = None,
+) -> Frame:
+    """Simulate one frame with the primary target(s) removed.
+
+    ``kind="noise_only"`` subtracts the whole noise-free scene, leaving exactly the
+    AWGN realization the repo simulator drew, at exactly the variance it chose for
+    the corresponding target-present frame.  ``kind="clutter_only"`` subtracts only
+    the primary target, leaving clutter + TX coupling + that same noise.
+
+    This is the only way to get a target-free scene out of the repo model:
+    ``simulate_fmcw_signal`` computes the noise variance as
+    ``mean(|beat|^2) / snr_linear`` and skips the noise term entirely when the scene
+    is empty, so calling it with ``targets=[]`` returns an all-zero map rather than a
+    noise-only one.
+    """
+    if kind not in ("noise_only", "clutter_only"):
+        raise ValueError(f"kind must be 'noise_only' or 'clutter_only', got {kind!r}")
+    repo = load_repo_modules()
+    dataset_cls = repo["AIRadarDataset"]
+
+    if reference is None:
+        _, sim_targets, reference = scene_reference(params, trial, base_seed)
+    else:
+        _, sim_targets = draw_scenario(params, trial, base_seed)
+
+    correction_db = _resolve_correction(reference, snr_reference)
+
+    _seed_globals(base_seed, 2, trial, snr_index)
+    beat_rx, _ = dataset_cls.simulate_fmcw_signal(
+        params, sim_targets, snr_db=snr_db + correction_db
+    )
+    subtract = reference.beat_all if kind == "noise_only" else reference.beat_primary
+    residual = beat_rx - subtract
+
+    rd_complex = rd_map_from_beat(params, residual)
+    return Frame(
+        rd_map_complex=rd_complex,
+        rd_map_db=repo_db_map(rd_complex),
+        rd_map_detector_input=detector_input_from_rd(rd_complex),
+        targets=(),
+        snr_db=float(snr_db),
+        trial=trial,
+        peak_snr_db=float("nan"),
+        target_bin_snr_linear=float("nan"),
+        snr_correction_db=float(correction_db),
+        kind=kind,
+    )
+
+
+def measure_target_bin_snr_linear(
+    rd_complex: np.ndarray,
+    targets: list[GroundTruthTarget],
+    guard_bins: int = 6,
+) -> float:
+    """Noise-subtracted target-to-background power ratio at the ground-truth bin.
+
+    ``(P_target_bin - P_background) / P_background`` in the *linear* power domain,
+    averaged over targets, where ``P_background`` is the mean power of cells at least
+    ``guard_bins`` away from every target in both axes.  With clutter enabled the
+    background includes the clutter, so this is a target-to-(noise+clutter) ratio.
+
+    Two properties :func:`measure_peak_snr_db` does not have: it is an unbiased
+    estimate rather than a maximum (so it does not floor at "the largest noise cell
+    in the window" once the target is buried), and it is proportional to the
+    requested SNR, so averaging it over trials in the linear domain and only then
+    converting to dB gives a column that keeps decreasing instead of flattening.
+    Negative values are possible, and meaningful, at very low SNR.
+    """
+    if not targets:
+        return float("nan")
+    power = np.abs(rd_complex) ** 2
+    mask = np.ones(power.shape, dtype=bool)
+    for t in targets:
+        d0 = max(0, t.doppler_bin - guard_bins)
+        d1 = min(power.shape[0], t.doppler_bin + guard_bins + 1)
+        r0 = max(0, t.range_bin - guard_bins)
+        r1 = min(power.shape[1], t.range_bin + guard_bins + 1)
+        mask[d0:d1, r0:r1] = False
+    if not mask.any():  # pragma: no cover - defensive
+        return float("nan")
+    background = float(np.mean(power[mask]))
+    if background <= 0:  # pragma: no cover - defensive
+        return float("nan")
+    ratios = [
+        (float(power[t.doppler_bin, t.range_bin]) - background) / background
+        for t in targets
+    ]
+    return float(np.mean(ratios))
 
 
 def measure_peak_snr_db(
@@ -325,11 +561,17 @@ def measure_peak_snr_db(
 ) -> float:
     """Measured target-peak-to-noise-floor ratio in the range-Doppler map, in dB.
 
-    The noise floor is the median dB level over cells that are at least
-    ``guard_bins`` away (in both axes) from every ground-truth target.  Reported
-    as a diagnostic because the ``snr_db`` knob of ``simulate_fmcw_signal`` is a
-    *time-domain* SNR: coherent range+Doppler integration adds tens of dB before
-    the detector ever sees the data.
+    ``max(rd_map_db)`` over a +/-``guard_bins`` window around each target, minus the
+    median dB level of the cells outside every such window.
+
+    **This column has a floor and must not be read below it.**  Once the target is
+    weaker than the strongest noise cell in its own window, the "peak" is that noise
+    cell, so the value stops tracking the target and settles at the
+    max-of-window-minus-median level of pure noise -- about +9.2 dB for the default
+    ``config_phaser`` sweep (13x13-cell window, Rayleigh magnitudes).  It is also not
+    guaranteed monotone once clutter enters the median.  Kept because it is a direct
+    reading of the map the detector sees, but the headline SNR column is derived from
+    :func:`measure_target_bin_snr_linear`, which degrades gracefully.
     """
     if not targets:
         return float("nan")

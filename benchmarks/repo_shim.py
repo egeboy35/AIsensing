@@ -15,7 +15,7 @@ Rather than patch the repo (this harness is additive only) or install a
 multi-gigabyte torch wheel to reach numpy code, we install minimal placeholder
 modules for the *absent* heavy dependencies, import the repo modules, then
 remove the placeholders from ``sys.modules`` again.  Anything already installed
-for real (numpy, scipy, tqdm, and matplotlib if present) is never stubbed.
+for real (numpy, scipy, and matplotlib or tqdm if present) is never stubbed.
 
 The functions this harness measures are then checked to make sure they do not
 reference the stubbed names at all -- see :func:`assert_no_stub_dependency`.
@@ -32,6 +32,17 @@ from importlib import util as importlib_util
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AIRADAR_DIR = os.path.join(REPO_ROOT, "AIRadar")
 
+def _passthrough_progress_bar(iterable=None, *args, **kwargs):
+    """Stand-in for ``tqdm.tqdm``: return the iterable unchanged.
+
+    Only reached if repo code the benchmark does not call decides to wrap an
+    iterable; the benchmarked functions are checked not to reference ``tqdm``.
+    """
+    if iterable is None:
+        return ()
+    return iterable
+
+
 # Modules the repo imports at module scope but that the numpy code paths never
 # touch.  Each entry is (module name, {attribute: value}) -- the attributes are
 # the ones third-party code introspects (e.g. scipy's array-API dispatch looks
@@ -43,6 +54,12 @@ _STUB_SPECS: tuple[tuple[str, dict], ...] = (
     ("torch.utils", {}),
     ("torch.utils.data", {}),
     ("h5py", {}),
+    # ``AIradar_datasetv8.py`` line 5 does ``from tqdm import tqdm``, so a fresh
+    # numpy/scipy/matplotlib environment without tqdm fails at import.  The
+    # placeholder returns the iterable unchanged; the benchmarked code paths never
+    # construct a progress bar (only ``generate_dataset`` does, and that is never
+    # called), which ``assert_no_stub_dependency`` enforces.
+    ("tqdm", {"tqdm": _passthrough_progress_bar}),
     ("matplotlib", {}),
     ("matplotlib.pyplot", {}),
     ("matplotlib.cm", {}),
@@ -162,7 +179,9 @@ def load_repo_modules() -> dict:
 
 #: Names that must never appear in the bytecode of a benchmarked function,
 #: because they are the modules the shim faked.
-_FORBIDDEN_GLOBALS = frozenset({"torch", "F", "h5py", "plt", "cm", "Axes3D", "cv2"})
+_FORBIDDEN_GLOBALS = frozenset(
+    {"torch", "F", "h5py", "plt", "cm", "Axes3D", "cv2", "tqdm"}
+)
 
 
 def assert_no_stub_dependency(*functions) -> None:

@@ -345,3 +345,64 @@ def test_eligible_cell_count_is_within_the_map(repo):
     for detector in build_detectors(params):
         eligible = detector.eligible_cells(params)
         assert 0 < eligible <= total_cells
+
+
+def test_different_trials_draw_different_scenes(repo):
+    """Guard the statistical meaning of every Pd number in the benchmark.
+
+    ``draw_scenario`` keys its RNG on ``(base_seed, 1, trial)``. If the ``trial``
+    component were dropped, every "independent" frame at an SNR point would be the
+    same scene repeated, and the resulting Pd would be one scene's outcome dressed
+    up as an average. That mutation used to pass the whole suite, so assert the
+    property directly: distinct trials must yield distinct target draws.
+    """
+    from benchmarks.scenarios import RadarParams, draw_scenario
+
+    params = RadarParams(repo["RADAR_CONFIGS"]["config_phaser"], max_targets=1)
+    scenes = []
+    for trial in range(8):
+        targets, _ = draw_scenario(params, trial=trial, base_seed=4242)
+        scenes.append(
+            tuple((round(t["range"], 6), round(t["velocity"], 6)) for t in targets)
+        )
+
+    assert len(set(scenes)) >= 7, (
+        "draw_scenario returned the same scene for different trials "
+        f"({len(set(scenes))} distinct out of {len(scenes)}); the per-SNR frames are "
+        "then not independent samples and Pd loses its meaning."
+    )
+    # Same trial must still be reproducible from the same seed.
+    again, _ = draw_scenario(params, trial=3, base_seed=4242)
+    assert scenes[3] == tuple(
+        (round(t["range"], 6), round(t["velocity"], 6)) for t in again
+    )
+
+
+def test_calibration_index_outside_the_evaluation_range(repo):
+    """Calibration must not be measured on an evaluation noise realisation.
+
+    Frames are seeded on ``(base_seed, 2, trial, snr_index)``, so a calibration
+    index inside ``0..len(snr_points)-1`` would tune each detector's threshold on
+    exactly the noise the sweep then scores. The default must sit outside that
+    range, and the runner must refuse an overlapping one.
+    """
+    from benchmarks.run_benchmark import DEFAULT_SNR_DB, build_parser
+
+    args = build_parser().parse_args([])
+    assert not (0 <= args.calibration_snr_index < len(DEFAULT_SNR_DB)), (
+        f"default --calibration-snr-index {args.calibration_snr_index} overlaps the "
+        f"evaluation range 0..{len(DEFAULT_SNR_DB) - 1}"
+    )
+
+
+def test_target_free_frames_carry_no_targets(repo):
+    """``measure_curve`` counts every returned peak as a false alarm, which is only
+    true if the calibration frames really contain no targets."""
+    from benchmarks.scenarios import RadarParams, simulate_target_free_frame
+
+    params = RadarParams(repo["RADAR_CONFIGS"]["config_phaser"], max_targets=1)
+    for kind in ("noise_only", "clutter_only"):
+        frame = simulate_target_free_frame(
+            params, trial=0, snr_index=1000, snr_db=-30.0, base_seed=99, kind=kind
+        )
+        assert frame.targets == () or len(frame.targets) == 0, kind
