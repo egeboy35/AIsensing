@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """
-RF Link Test - Step 5: TX (NO-SHIFT FFT convention, matches rf_step5_rx_stable.py)
+RF Link Test - Step 5: TX (NO-SHIFT FFT convention)
 
 Key point:
 - Subcarrier mapping uses UN-SHIFTED FFT bins:
     bin = (k + N) % N
 - IFFT uses np.fft.ifft(X)  (NO ifftshift)
 Therefore RX must use np.fft.fft() (NO fftshift) and the same bin mapping.
+
+Receiver compatibility: no receiver in this repository uses that convention.
+Every Step 5 RX (rf_step5_rx_stable.py, _fix.py, _cfg_dbg.py, _debug_capture.py,
+_multipkt_dbg.py) demodulates with np.fft.fftshift(np.fft.fft(...)) -- see for
+example rf_step5_rx_stable.py:265 -- while still indexing bins as (k + N) % N.
+Against those receivers this transmitter's subcarriers land N/2 bins away: a
+tone sent on k = -21 is read at bin 11 instead of 43, and the payload never
+parses. Use rf_link_step5_tx.py (which applies ifftshift) with those receivers,
+or pair this file with a receiver written to the un-shifted convention.
 
 Packet format (AIS1):
   MAGIC("AIS1", 4B) | LEN(2B) | PAYLOAD | CRC32(4B)

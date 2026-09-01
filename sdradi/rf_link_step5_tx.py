@@ -128,7 +128,9 @@ def main():
     ap = argparse.ArgumentParser(description="RF Link Test - TX (Step 5)")
     ap.add_argument("--uri", default="ip:192.168.2.1", help="Pluto URI")
     ap.add_argument("--fc", type=float, default=915e6, help="Center frequency (Hz)")
-    ap.add_argument("--fs", type=float, default=2e6, help="Sample rate (Hz)")
+    ap.add_argument("--fs", type=float, default=2e6,
+                    help="Sample rate (Hz). Must match the receiver: rf_step5_rx_stable.py "
+                         "defaults to 3e6, so pass --fs explicitly on both sides.")
     ap.add_argument("--tx_gain", type=float, default=-5, help="TX gain (dB)")
     ap.add_argument("--tone_duration_ms", type=float, default=10, help="Pilot tone duration (ms)")
     ap.add_argument("--stf_repeats", type=int, default=6, help="STF symbol repeats")

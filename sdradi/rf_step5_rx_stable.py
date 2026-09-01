@@ -924,7 +924,9 @@ def main():
     ap = argparse.ArgumentParser("Step5 RX Stable (AIS1)")
     ap.add_argument("--uri", default="ip:192.168.2.2")
     ap.add_argument("--fc", type=float, default=2.3e9)
-    ap.add_argument("--fs", type=float, default=3e6)
+    ap.add_argument("--fs", type=float, default=3e6,
+                    help="Sample rate (Hz). Must match the transmitter: rf_link_step5_tx.py "
+                         "defaults to 2e6, so pass --fs explicitly on both sides.")
     ap.add_argument("--rx_gain", type=float, default=30.0)
     ap.add_argument("--rx_bw", type=float, default=0.0, help="0 => auto use 1.2*fs")
     ap.add_argument("--buf_size", type=int, default=131072)
