@@ -92,25 +92,27 @@ sdradi provides practical SDR scripts and reusable modules for communication/rad
 
 ### newsdr — latest lab branch and technical documents
 
-Path: [newsdr/](newsdr/)
+Path: `newsdr/`
+
+*The `newsdr/` directory is not currently tracked in this repository (it is listed in `.gitignore`), so the files below are referenced by name only.*
 
 newsdr tracks the latest lab-focused evolutions of key SDR/radar modules plus companion technical documentation.
 
 #### Current focus code
 
-- [myradar_all_in_one_v2.py](newsdr/myradar_all_in_one_v2.py)
-- [sdr_video_commv2_lab.py](newsdr/sdr_video_commv2_lab.py)
-- [sim_video_e2e_asyncv2_lab.py](newsdr/sim_video_e2e_asyncv2_lab.py)
-- [sdr_auto_tune.py](newsdr/sdr_auto_tune.py)
-- [radarappwdevice5b.py](newsdr/radarappwdevice5b.py)
+- `myradar_all_in_one_v2.py`
+- `sdr_video_commv2_lab.py`
+- `sim_video_e2e_asyncv2_lab.py`
+- `sdr_auto_tune.py`
+- `radarappwdevice5b.py`
 
 #### Technique docs added
 
-- [myradar_all_in_one_v2_technique.md](newsdr/myradar_all_in_one_v2_technique.md)
-- [sdr_video_commv2_lab_technique.md](newsdr/sdr_video_commv2_lab_technique.md)
-- [sim_video_e2e_asyncv2_lab_technique.md](newsdr/sim_video_e2e_asyncv2_lab_technique.md)
-- [sdr_auto_tune_technique.md](newsdr/sdr_auto_tune_technique.md)
-- [radarappwdevice5b_technique.md](newsdr/radarappwdevice5b_technique.md)
+- `myradar_all_in_one_v2_technique.md`
+- `sdr_video_commv2_lab_technique.md`
+- `sim_video_e2e_asyncv2_lab_technique.md`
+- `sdr_auto_tune_technique.md`
+- `radarappwdevice5b_technique.md`
 
 ## Quick Start
 
@@ -157,15 +159,15 @@ python sdradi/radarappwdevice5.py
 python sdradi/sdr_video_commv2_lab.py --mode loopback
 ```
 
-- SDR auto tune/scanner:
+- SDR auto tune/scanner (optionally pass `--ip` to select the device, default `ip:192.168.3.2`):
 
 ```bash
-python sdradi/sdr_auto_tune.py --mode rx
+python sdradi/sdr_auto_tune.py
 ```
 
 ## PlutoSDR Setup and Recovery
 
-This section mirrors key operational guidance from [docs/plutosdr_setup_guide.md](docs/plutosdr_setup_guide.md) for quick access.
+This section mirrors key operational guidance from `docs/plutosdr_setup_guide.md` for quick access. *The `docs/` directory is not currently tracked in this repository.*
 
 ### Quick recovery scripts
 
@@ -242,7 +244,7 @@ python sdradi/check_remote_sdr.py
 ## SDR Radios at a Glance
 
 This project primarily targets ADI-compatible SDR workflows, with ADALM-PLUTO as a core development device.  
-Reference details are in [docs/sdr_radios.md](docs/sdr_radios.md).
+Reference details are in `docs/sdr_radios.md`. *The `docs/` directory is not currently tracked in this repository.*
 
 ### ADALM-PLUTO quick profile
 
@@ -328,7 +330,7 @@ pip install pyadi-iio pylibiio scipy matplotlib pyqtgraph pyqt6 opencv-python-he
 
 - SDR architecture and workflows: [sdradi/sdr.md](sdradi/sdr.md)
 - Waterfall visualization notes: [sdradi/otheradis/waterfall.md](sdradi/otheradis/waterfall.md)
-- Latest lab technical docs: [newsdr/](newsdr/)
+- Latest lab technical docs: `newsdr/` *(not currently tracked in this repository)*
 
 ## Contribution Guide
 
