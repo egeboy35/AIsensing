@@ -10,6 +10,10 @@ Radar config `config_phaser` (Phaser_10GHz_DevKit): baseline RD map 64 x 667 bin
 
 ### What the measurement says
 
+**Read this first: the scene.** Every number below is measured on `clutter_off` -- one non-fluctuating point target in homogeneous AWGN. That is precisely the regime in which the CFAR's own parameters are *designed* to be irrelevant: guard cells exist to keep an extended or nearby return out of the noise estimate, and the greatest-of/smallest-of averaging modes exist to hold the false-alarm rate across a clutter edge. Homogeneous noise contains neither. So "the CFAR parameters are flat" is established *for this scene*, and it is not evidence that they can be set carelessly in the scene the shipped pipeline actually runs -- `apply_realistic_effects=True` turns clutter on. Extending these axes to a clutter scenario is the obvious next study and is not done here.
+
+
+**Marginal rows.** `range_zero_padding` = 1 (+0.36 dB [+0.018, +1.73]) clears zero by less than 0.10 dB. The equal-false-alarm audit puts each configuration within about 0.09 dB of the rate it was solved for, so a margin that small sits inside the calibration residual. Treat these as suggestive rather than established; confirming one would need a larger frame budget and more calibration frames.
 **4 of the 8 axes move the curve** by more than their own 95% interval (`cfar_training_cells`, `range_zero_padding`, `coherent_chirps`, `noncoherent_looks`); the other 4 do not at this budget (`cfar_guard_cells`, `nms_kernel`, `mtd_filter`, `cfar_averaging`).
 
 **Doubling the dwell time, two ways.** Doubling the chirp count -- coherent integration, one detection per frame as before -- buys +2.90 dB [+1.31, +4.25]. Spending the same extra dwell on a second look integrated non-coherently buys +2.76 dB [+1.61, +4.06].
@@ -45,12 +49,12 @@ Cost: window grows as (2*(train+guard)+1)^2; guard=12 costs ~2.4x the baseline c
 
 | num_guard | calibrated thr (dB) | FA/frame at floor | Pd@-36.0 dB | dPd [95% CI] | Pd@-27.0 dB | SNR at Pd=0.50 (dB) | shift (dB) [95% CI] | verdict |
 |---|---|---|---|---|---|---|---|---|
-| 0 | 9.68 | 4.28 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.44 | +0.00 [-0.75, +0.70] | not resolved (needs ~112 frames/point) |
-| 2 | 9.66 | 4.41 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.55 | +0.04 [-0.43, +1.00] | not resolved (needs ~112 frames/point) |
+| 0 | 9.68 | 4.28 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.44 | +0.00 [-0.75, +0.70] | not resolved (95% CI [-0.75, +0.70] dB) |
+| 2 | 9.66 | 4.41 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.55 | +0.04 [-0.43, +1.00] | not resolved (95% CI [-0.43, +1.00] dB) |
 | **4** | 9.67 | 4.00 | 0.438 | -- | 1.000 | -35.50 | -- | baseline |
-| 6 | 9.61 | 4.12 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.50 | +0.00 [-0.50, +0.83] | not resolved (needs ~122 frames/point) |
-| 8 | 9.61 | 4.00 | 0.469 | +0.031 [+0.000, +0.094] | 1.000 | -35.81 | +0.19 [+0.00, +1.62] | not resolved (needs ~114 frames/point) |
-| 12 | 9.59 | 4.34 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.70 | +0.12 [+0.00, +1.31] | not resolved (dPd is exactly 0 here) |
+| 6 | 9.61 | 4.12 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.50 | +0.00 [-0.50, +0.83] | not resolved (95% CI [-0.50, +0.83] dB) |
+| 8 | 9.61 | 4.00 | 0.469 | +0.031 [+0.000, +0.094] | 1.000 | -35.81 | +0.19 [+0.00, +1.62] | not resolved (95% CI [+0.00, +1.62] dB) |
+| 12 | 9.59 | 4.34 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.70 | +0.12 [+0.00, +1.31] | not resolved (95% CI [+0.00, +1.31] dB) |
 
 ### `cfar_training_cells` -- `num_train`
 
@@ -61,10 +65,10 @@ Cost: num_train=2 runs ~5x faster than num_train=10; num_train=16 ~1.9x slower. 
 | num_train | calibrated thr (dB) | FA/frame at floor | Pd@-36.0 dB | dPd [95% CI] | Pd@-27.0 dB | SNR at Pd=0.50 (dB) | shift (dB) [95% CI] | verdict |
 |---|---|---|---|---|---|---|---|---|
 | 2 | 9.77 | 4.28 | 0.219 | -0.219 [-0.375, -0.094] | 1.000 | -34.00 | -1.50 [-3.25, -0.38] | loss |
-| 4 | 9.65 | 4.41 | 0.312 | -0.125 [-0.250, -0.031] | 1.000 | -35.18 | -0.25 [-1.25, +0.30] | not resolved (needs ~32 frames/point) |
-| 6 | 9.62 | 4.28 | 0.438 | +0.000 [-0.094, +0.094] | 1.000 | -35.67 | +0.12 [-0.31, +1.25] | not resolved (dPd is exactly 0 here) |
+| 4 | 9.65 | 4.41 | 0.312 | -0.125 [-0.250, -0.031] | 1.000 | -35.18 | -0.25 [-1.25, +0.30] | not resolved (95% CI [-1.25, +0.30] dB) |
+| 6 | 9.62 | 4.28 | 0.438 | +0.000 [-0.094, +0.094] | 1.000 | -35.67 | +0.12 [-0.31, +1.25] | not resolved (95% CI [-0.31, +1.25] dB) |
 | **10** | 9.67 | 4.00 | 0.438 | -- | 1.000 | -35.50 | -- | baseline |
-| 16 | 9.61 | 4.25 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.67 | +0.10 [+0.00, +1.20] | not resolved (dPd is exactly 0 here) |
+| 16 | 9.61 | 4.25 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.67 | +0.10 [+0.00, +1.20] | not resolved (95% CI [+0.00, +1.20] dB) |
 
 ### `nms_kernel` -- `nms_kernel_size`
 
@@ -74,12 +78,12 @@ Cost: a maximum filter over the whole map; negligible next to the CFAR convoluti
 
 | nms_kernel_size | calibrated thr (dB) | FA/frame at floor | Pd@-36.0 dB | dPd [95% CI] | Pd@-27.0 dB | SNR at Pd=0.50 (dB) | shift (dB) [95% CI] | verdict |
 |---|---|---|---|---|---|---|---|---|
-| 1 | 9.70 | 3.97 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.36 | -0.07 [-0.75, +0.00] | not resolved (needs ~112 frames/point) |
-| 3 | 9.68 | 4.00 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [+0.00, +0.00] | not resolved (dPd is exactly 0 here) |
+| 1 | 9.70 | 3.97 | 0.406 | -0.031 [-0.094, +0.000] | 1.000 | -35.36 | -0.07 [-0.75, +0.00] | not resolved (95% CI [-0.75, +0.00] dB) |
+| 3 | 9.68 | 4.00 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [+0.00, +0.00] | not resolved (95% CI [+0.00, +0.00] dB) |
 | **5** | 9.67 | 4.00 | 0.438 | -- | 1.000 | -35.50 | -- | baseline |
-| 7 | 9.67 | 4.00 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [+0.00, +0.00] | not resolved (dPd is exactly 0 here) |
-| 9 | 9.67 | 4.00 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [-0.02, +0.00] | not resolved (dPd is exactly 0 here) |
-| 15 | 9.67 | 4.06 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [-0.02, +0.00] | not resolved (dPd is exactly 0 here) |
+| 7 | 9.67 | 4.00 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [+0.00, +0.00] | not resolved (95% CI [+0.00, +0.00] dB) |
+| 9 | 9.67 | 4.00 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [-0.02, +0.00] | not resolved (95% CI [-0.02, +0.00] dB) |
+| 15 | 9.67 | 4.06 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.50 | +0.00 [-0.02, +0.00] | not resolved (95% CI [-0.02, +0.00] dB) |
 
 ### `range_zero_padding` -- `zero_pad_factor`
 
@@ -91,7 +95,7 @@ Cost: detector cost is proportional to the number of range bins. Baseline value:
 |---|---|---|---|---|---|---|---|---|
 | 1 | 9.27 | 4.28 | 0.500 | +0.062 [+0.000, +0.156] | 1.000 | -36.00 | +0.36 [+0.02, +1.73] | gain |
 | **2** | 9.67 | 4.00 | 0.438 | -- | 1.000 | -35.50 | -- | baseline |
-| 4 | 9.84 | 3.97 | 0.344 | -0.094 [-0.188, +0.000] | 1.000 | -35.17 | -0.25 [-1.33, +0.29] | not resolved (needs ~38 frames/point) |
+| 4 | 9.84 | 3.97 | 0.344 | -0.094 [-0.188, +0.000] | 1.000 | -35.17 | -0.25 [-1.33, +0.29] | not resolved (95% CI [-1.33, +0.29] dB) |
 
 ### `coherent_chirps` -- `N_chirps`
 
@@ -127,7 +131,7 @@ Cost: free (a filter on the detection list). Baseline value: `off`.
 | mtd | calibrated thr (dB) | FA/frame at floor | Pd@-36.0 dB | dPd [95% CI] | Pd@-27.0 dB | SNR at Pd=0.50 (dB) | shift (dB) [95% CI] | verdict |
 |---|---|---|---|---|---|---|---|---|
 | **off** | 9.67 | 4.00 | 0.438 | -- | 1.000 | -35.50 | -- | baseline |
-| on | 9.63 | 3.94 | 0.375 | -0.062 [-0.156, +0.000] | 0.906 | -35.25 | -0.17 [-1.50, +0.30] | not resolved (needs ~59 frames/point) |
+| on | 9.63 | 3.94 | 0.375 | -0.062 [-0.156, +0.000] | 0.906 | -35.25 | -0.17 [-1.50, +0.30] | not resolved (95% CI [-1.50, +0.30] dB) |
 
 ### `cfar_averaging` -- `method`
 
@@ -138,8 +142,8 @@ Cost: identical (the same convolutions, combined differently). Baseline value: `
 | method | calibrated thr (dB) | FA/frame at floor | Pd@-36.0 dB | dPd [95% CI] | Pd@-27.0 dB | SNR at Pd=0.50 (dB) | shift (dB) [95% CI] | verdict |
 |---|---|---|---|---|---|---|---|---|
 | **GO** | 9.67 | 3.97 | 0.438 | -- | 1.000 | -35.50 | -- | baseline |
-| CA | 9.72 | 4.03 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.62 | +0.06 [+0.00, +1.02] | not resolved (dPd is exactly 0 here) |
-| SO | 9.83 | 4.31 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.57 | +0.02 [+0.00, +0.60] | not resolved (dPd is exactly 0 here) |
+| CA | 9.72 | 4.03 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.62 | +0.06 [+0.00, +1.02] | not resolved (95% CI [+0.00, +1.02] dB) |
+| SO | 9.83 | 4.31 | 0.438 | +0.000 [+0.000, +0.000] | 1.000 | -35.57 | +0.02 [+0.00, +0.60] | not resolved (95% CI [+0.00, +0.60] dB) |
 
 ### Calibrated thresholds and what they cost
 
@@ -178,7 +182,9 @@ Every row is a solve on target-free frames, so the threshold column is a *result
 
 A Pd measured over 32 frames with one target each has a binomial standard error of 0.088 at Pd = 0.5, and is quantized to 1/32 = 0.0312. That is the error bar on an **absolute** Pd, and it is why no absolute Pd in this study should be read to better than about +/-0.18.
 
-The differences are better resolved than that, because they are paired: every configuration is measured on the same physical scenes and the same noise draws, so scene difficulty cancels. The bracketed intervals are the bootstrap of that paired difference, and they are the numbers to read. Where an interval spans zero the study **cannot resolve that axis** at this budget, and the verdict column states the per-point frame budget that would.
+**Multiplicity.** 24 non-baseline comparisons are each reported at a 95% interval, so roughly one in twenty would be expected to exclude zero by chance; across a family this size the chance of at least one false positive is appreciable. The intervals below are per-comparison and are not corrected. Read a result as established only if it clears a Bonferroni threshold for 24 tests -- which the integration axes and `cfar_training_cells` = 2 do comfortably, and the marginal rows do not.
+
+The differences are better resolved than that, because they are paired: every configuration is measured on the same physical scenes and the same noise draws, so scene difficulty cancels. The bracketed intervals are the bootstrap of that paired difference, and they are the numbers to read. Where an interval spans zero the study **cannot resolve that axis** at this budget, and the verdict column repeats that interval -- its upper end is what an unmeasured effect could still be worth. The per-point frame budget that would resolve the Pd difference at the reference SNR is a different statistic and is carried in the CSV rather than the verdict.
 
 Total: 26 configurations, 14176 detector calls.
 

@@ -643,10 +643,15 @@ def _verdict(member: dict) -> str:
         return "crossing off-grid in {:.0%} of resamples".format(shift["undefined_fraction"])
     if member["resolved_shift"]:
         return "gain" if shift["shift_db_median"] > 0 else "loss"
-    needed = member["frames_to_resolve_pd_difference"]
-    if needed is None:
-        return "not resolved (dPd is exactly 0 here)"
-    return f"not resolved (needs ~{needed} frames/point)"
+    # Report only the shift's own interval. The frame budget stored on this
+    # member is derived from the Pd difference at the reference SNR, a
+    # different statistic, so quoting it here produced cells that contradicted
+    # themselves (e.g. "not resolved (needs ~32 frames/point)" in a run that
+    # used 32). The Pd-difference budget is still emitted in the CSV for
+    # anyone sizing a follow-up on that quantity.
+    lo = shift["shift_db_lo"]
+    hi = shift["shift_db_hi"]
+    return f"not resolved (95% CI [{lo:+.2f}, {hi:+.2f}] dB)"
 
 
 def _member(analysis: dict, axis_name: str, value: str) -> dict | None:
@@ -677,9 +682,52 @@ def _headline_lines(report: dict) -> list[str]:
     moving = [a for a in axes if a["any_resolved"]]
     flat = [a for a in axes if not a["any_resolved"]]
     lines = ["### What the measurement says", ""]
+    lines.append(
+        "**Read this first: the scene.** Every number below is measured on `clutter_off` "
+        "-- one non-fluctuating point target in homogeneous AWGN. That is precisely the "
+        "regime in which the CFAR's own parameters are *designed* to be irrelevant: "
+        "guard cells exist to keep an extended or nearby return out of the noise "
+        "estimate, and the greatest-of/smallest-of averaging modes exist to hold the "
+        "false-alarm rate across a clutter edge. Homogeneous noise contains neither. So "
+        "\"the CFAR parameters are flat\" is established *for this scene*, and it is not "
+        "evidence that they can be set carelessly in the scene the shipped pipeline "
+        "actually runs -- `apply_realistic_effects=True` turns clutter on. Extending "
+        "these axes to a clutter scenario is the obvious next study and is not done "
+        "here."
+    )
+    lines.append("")
 
     def names(items):
         return ", ".join(f"`{a['name']}`" for a in items) if items else "none"
+
+    # A "resolved" row whose interval only just clears zero is worth flagging:
+    # the equal-false-alarm audit shows each configuration lands within about
+    # 0.09 dB of the solved rate, so a margin below that is inside the
+    # calibration residual and should not be read as established.
+    MARGIN_DB = 0.10
+    marginal = []
+    for axis in analysis["axes"]:
+        for member in axis["members"]:
+            if member["is_axis_baseline"] or not member.get("resolved_shift"):
+                continue
+            sh = member["shift_db"]
+            lo, hi = sh["shift_db_lo"], sh["shift_db_hi"]
+            nearest = min(abs(lo), abs(hi))
+            if nearest < MARGIN_DB:
+                marginal.append((axis["name"], member["value"], sh["shift_db_median"], lo, hi))
+    if marginal:
+        bits = ", ".join(
+            f"`{name}` = {value} ({med:+.2f} dB [{lo:+.3f}, {hi:+.2f}])"
+            for name, value, med, lo, hi in marginal
+        )
+        lines.append("")
+        lines.append(
+            f"**Marginal rows.** {bits} clears zero by less than {MARGIN_DB:.2f} dB. "
+            "The equal-false-alarm audit puts each configuration within about 0.09 dB of "
+            "the rate it was solved for, so a margin that small sits inside the "
+            "calibration residual. Treat these as suggestive rather than established; "
+            "confirming one would need a larger frame budget and more calibration frames."
+        )
 
     integration = {"coherent_chirps", "noncoherent_looks"}
     moving_names = {a["name"] for a in moving}
@@ -972,7 +1020,10 @@ def render_markdown(report: dict) -> str:
     lines.append("")
     lines.append("| config | detector | knob | calibrated knob value | effective thr (dB) | status |")
     lines.append("|---|---|---|---|---|---|")
-    for key, result in report["configs"].items():
+    # Sorted so the live path and --render-from (which reads a sort_keys=True
+    # JSON) emit identical bytes.
+    for key in sorted(report["configs"]):
+        result = report["configs"][key]
         cal = result["calibration"]
         lines.append(
             f"| `{key}` | `{result['detector']}` | `{cal['knob']}` | "
@@ -982,6 +1033,12 @@ def render_markdown(report: dict) -> str:
     lines.append("")
 
     se = analysis["single_pd_standard_error_at_half"]
+    n_comparisons = sum(
+        1
+        for axis in analysis["axes"]
+        for member in axis["members"]
+        if not member["is_axis_baseline"]
+    )
     lines.append("### The error bar")
     lines.append("")
     lines.append(
@@ -993,12 +1050,25 @@ def render_markdown(report: dict) -> str:
     )
     lines.append("")
     lines.append(
+        f"**Multiplicity.** {n_comparisons} non-baseline comparisons are each reported "
+        f"at a {CONFIDENCE:.0%} interval, so roughly one in twenty would be expected to "
+        "exclude zero by chance; across a family this size the chance of at least one "
+        "false positive is appreciable. The intervals below are per-comparison and are "
+        "not corrected. Read a result as established only if it clears a Bonferroni "
+        f"threshold for {n_comparisons} tests -- which the integration axes and "
+        "`cfar_training_cells` = 2 do comfortably, and the marginal rows do not."
+    )
+    lines.append("")
+    lines.append(
         "The differences are better resolved than that, because they are paired: every "
         "configuration is measured on the same physical scenes and the same noise draws, "
         "so scene difficulty cancels. The bracketed intervals are the bootstrap of that "
         "paired difference, and they are the numbers to read. Where an interval spans "
         "zero the study **cannot resolve that axis** at this budget, and the verdict "
-        "column states the per-point frame budget that would."
+        "column repeats that interval -- its upper end is what an unmeasured effect "
+        "could still be worth. The per-point frame budget that would resolve the Pd "
+        "difference at the reference SNR is a different statistic and is carried in "
+        "the CSV rather than the verdict."
     )
     lines.append("")
     lines.append(
