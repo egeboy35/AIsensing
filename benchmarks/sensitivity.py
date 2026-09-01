@@ -210,6 +210,7 @@ def bootstrap_shift(
             "shift_db_lo": None,
             "shift_db_hi": None,
             "shift_db_se": None,
+            "shift_db_zero_fraction": None,
             "undefined_fraction": 1.0,
             "resamples": total,
         }
@@ -220,6 +221,12 @@ def bootstrap_shift(
         "shift_db_lo": float(np.percentile(values, tail)),
         "shift_db_hi": float(np.percentile(values, 100.0 - tail)),
         "shift_db_se": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
+        # The shift is a lattice-valued functional: Pd moves in steps of 1/trials,
+        # so many resamples reproduce the baseline curve exactly and the shift is
+        # exactly zero. When that atom is large the percentile endpoints are the
+        # atom itself, not a smooth quantile, and must not be read as a bound on
+        # the effect. Measured here so the report can say which rows those are.
+        "shift_db_zero_fraction": float(np.mean(values == 0.0)),
         "undefined_fraction": float(undefined / total),
         "resamples": total,
     }

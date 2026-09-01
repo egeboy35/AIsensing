@@ -1039,6 +1039,28 @@ def render_markdown(report: dict) -> str:
         for member in axis["members"]
         if not member["is_axis_baseline"]
     )
+    # Bonferroni ordering, computed rather than asserted: |shift| / bootstrap SE
+    # scored against the two-sided normal threshold for the whole family.
+    from scipy.stats import norm as _norm  # scipy is already a benchmark dependency
+    _z_crit = float(_norm.isf((0.05 / max(n_comparisons, 1)) / 2.0))
+    bonf_pass, bonf_fail = [], []
+    for axis in analysis["axes"]:
+        for member in axis["members"]:
+            if member["is_axis_baseline"]:
+                continue
+            sh = member["shift_db"]
+            se = sh.get("shift_db_se") or 0.0
+            med = sh.get("shift_db_median")
+            if med is None:
+                continue
+            z = abs(med) / se if se > 0 else 0.0
+            label = f"`{axis['name']}` = {member['value']}"
+            if z >= _z_crit:
+                bonf_pass.append(label)
+            elif member.get("resolved_shift"):
+                bonf_fail.append(label)
+    bonf_names = ", ".join(bonf_pass)
+    bonf_fail_names = ", ".join(bonf_fail)
     lines.append("### The error bar")
     lines.append("")
     lines.append(
@@ -1048,15 +1070,45 @@ def render_markdown(report: dict) -> str:
         f"**absolute** Pd, and it is why no absolute Pd in this study should be read to "
         f"better than about +/-{2 * se:.2f}."
     )
+    pinned = []
+    for axis in analysis["axes"]:
+        for member in axis["members"]:
+            if member["is_axis_baseline"]:
+                continue
+            sh = member["shift_db"]
+            zf = sh.get("shift_db_zero_fraction")
+            if zf is not None and zf >= 0.25:
+                pinned.append((axis["name"], member["value"], zf, sh["shift_db_lo"], sh["shift_db_hi"]))
+    if pinned:
+        worst = max(zf for _, _, zf, _, _ in pinned)
+        rows = ", ".join(
+            f"`{name}` = {value} ({zf:.0%})" for name, value, zf, _, _ in pinned
+        )
+        lines.append("")
+        lines.append(
+            f"**Where the interval is not a bound.** Pd moves in steps of 1/{settings['trials']}, "
+            "so the shift is a lattice-valued statistic and a resample often reproduces the "
+            "baseline curve exactly, putting an atom of probability at exactly zero. In "
+            f"{len(pinned)} of the {n_comparisons} comparisons that atom holds at least 25% of "
+            f"the resamples (up to {worst:.0%}): {rows}. For those rows a percentile endpoint "
+            "printed as +0.00 is the atom itself rather than a 2.5% quantile, so it is **not** "
+            "an upper bound on the effect -- it says the two configurations produce the same "
+            "detections on these frames, which is a statement about this budget and these "
+            "scenes. Bounding those axes needs either more frames or a smooth test statistic; "
+            "neither is done here."
+        )
     lines.append("")
     lines.append(
         f"**Multiplicity.** {n_comparisons} non-baseline comparisons are each reported "
-        f"at a {CONFIDENCE:.0%} interval, so roughly one in twenty would be expected to "
-        "exclude zero by chance; across a family this size the chance of at least one "
-        "false positive is appreciable. The intervals below are per-comparison and are "
-        "not corrected. Read a result as established only if it clears a Bonferroni "
-        f"threshold for {n_comparisons} tests -- which the integration axes and "
-        "`cfar_training_cells` = 2 do comfortably, and the marginal rows do not."
+        f"at a {CONFIDENCE:.0%} interval and none is corrected for the family, so roughly "
+        "one in twenty would be expected to exclude zero by chance. Scoring each shift "
+        "against its own bootstrap standard error and applying a Bonferroni threshold "
+        f"for {n_comparisons} tests, {len(bonf_pass)} survive"
+        + (f" ({bonf_names})" if bonf_pass else "")
+        + f" and {len(bonf_fail)} of the rows this study calls resolved do not"
+        + (f" ({bonf_fail_names})" if bonf_fail else "")
+        + ". That scoring assumes the shift is approximately normal, which the rows "
+        "flagged below are not, so treat it as an ordering rather than an exact p-value."
     )
     lines.append("")
     lines.append(
@@ -1064,11 +1116,9 @@ def render_markdown(report: dict) -> str:
         "configuration is measured on the same physical scenes and the same noise draws, "
         "so scene difficulty cancels. The bracketed intervals are the bootstrap of that "
         "paired difference, and they are the numbers to read. Where an interval spans "
-        "zero the study **cannot resolve that axis** at this budget, and the verdict "
-        "column repeats that interval -- its upper end is what an unmeasured effect "
-        "could still be worth. The per-point frame budget that would resolve the Pd "
-        "difference at the reference SNR is a different statistic and is carried in "
-        "the CSV rather than the verdict."
+        "zero the study **cannot resolve that axis** at this budget. The per-point "
+        "frame budget that would resolve the Pd difference at the reference SNR is a "
+        "different statistic and is carried in the CSV rather than the verdict."
     )
     lines.append("")
     lines.append(
